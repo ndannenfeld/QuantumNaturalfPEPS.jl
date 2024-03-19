@@ -1,11 +1,14 @@
 module DS_PEPS
     using ITensors
+    using Statistics
 
     include("PEPS.jl")
 
-    export init_PEPS
-    export peps_product
-    export init_Product_State
+    export PEPS
+    export flatten
+    export get_logψ_and_envs
     export inner_peps
-    export differentiate
+    export get_Ok
+    export update_double_layer_envs!
+    export get_sample
 end
