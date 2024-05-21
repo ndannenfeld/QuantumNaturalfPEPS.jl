@@ -1,18 +1,20 @@
-# true Environment is env.*exp(f)
+# the entries of the environments are all normalized by the absolute value of the biggest entrie of the first ITensor
+# to get the true environtment: contract with the MPS and afterwards multiply by exp(f)
 mutable struct Environment
     env::MPS
-    f::Float64
+    f::ComplexF64
     Environment(env, f) = new(env, f)
 end
 
 mutable struct PEPS
     tensors::Matrix{ITensor}
     double_layer_envs::Vector{Environment}
+    norm::Float64
     bond_dim::Integer
     sample_dim::Integer
     contract_dim::Integer
     double_contract_dim::Integer
-    PEPS(tensors, bond_dim; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=bond_dim) = new(tensors, [Environment(MPS(), 1) for i in 1:size(tensors)[1]-1], bond_dim, sample_dim, contract_dim, double_contract_dim)
+    PEPS(tensors, bond_dim; norm=0, sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim) = new(tensors, [Environment(MPS(), 1) for i in 1:size(tensors)[1]-1], norm, bond_dim, sample_dim, contract_dim, double_contract_dim)
 end
 
 Base.size(peps::PEPS) = size(peps.tensors)
@@ -21,7 +23,7 @@ Base.getindex(peps::PEPS, i::Int, j::Int) = peps.tensors[i, j] # You can use pep
 Base.setindex!(peps::PEPS, v, i::Int, j::Int) = (peps.tensors[i, j] = v)
 
 function flatten(peps::PEPS) # Flattens the tensors into a vector
-    θ = Float64[]
+    θ = ComplexF64[]
     for i in 1:size(peps)[1]
         for j in 1:size(peps)[2]
             append!(θ, reshape(Array(peps[i,j], inds(peps[i,j])), :))
@@ -32,11 +34,12 @@ end
 
 Base.length(peps::PEPS) = length(flatten(peps)) # length(θ)
 
-function write!(peps::PEPS, θ::Vector{Float64}) # Writes the vector θ into the tensors.
+function write!(peps::PEPS, θ::Vector{ComplexF64}) # Writes the vector θ into the tensors.
     pos = 1
     for i in 1:size(peps)[1]
         for j in 1:size(peps)[2]
             shift = prod(dim.(inds(peps[i,j])))
+            peps[i,j] *= im
             peps[i,j][:] = reshape(θ[pos:(pos+shift-1)], dim.(inds(peps[i,j])))
             pos += shift
         end
@@ -98,7 +101,7 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, Env_top=Array{Environ
     end
     
     Env_down = Array{Environment}(undef, size(S,1)-1)
-    out = Array{Float64}(undef, 2)
+    out = Array{ComplexF64}(undef, 2)
     
     if overwrite
         Env_top[1] = generate_env_row(peps[1], S[1,:], 1, peps.contract_dim)
@@ -116,10 +119,10 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, Env_top=Array{Environ
     end
     
     # once we calculated all environments we calculate <ψ|S> using the environments
-    out[1] = inner(Env_top[end].env,MPS([peps[size(S,1),j]*ITensor([(S[end,j]+1)%2, S[end,j]], inds(peps[size(S,1),j],"phys_$(j)_$(size(S,1))")) for j in 1:size(S,2)])) * exp(Env_top[end].f)
-    out[2] = inner(Env_down[end].env,MPS([peps[1,j]*ITensor([(S[1,j]+1)%2, S[1,j]], inds(peps[1,j],"phys_$(j)_$(1)")) for j in 1:size(S,2)])) * exp(Env_down[end].f)
+    out[1] = contract(Env_top[end].env.*MPS([peps[size(S,1),j]*ITensor([(S[end,j]+1)%2, S[end,j]], inds(peps[size(S,1),j],"phys_$(j)_$(size(S,1))")) for j in 1:size(S,2)]))[1] * exp(Env_top[end].f)
+    out[2] = contract((MPS([peps[1,j]*ITensor([(S[1,j]+1)%2, S[1,j]], inds(peps[1,j],"phys_$(j)_$(1)")) for j in 1:size(S,2)])).*Env_down[end].env)[1] * exp(Env_down[end].f)
     
-    return real(log(Complex(mean(out)))), Env_top, Env_down
+    return mean(log.(Complex.((out)))), Env_top, Env_down
 end
 
 # calculates the environments for a given row and contracts that with env_row_above
@@ -132,8 +135,9 @@ function generate_env_row(peps_row, S_row, i, contract_dim; env_row_above=nothin
         Env = apply(MPO(Env), env_row_above.env, maxdim=contract_dim)
         norm_shift = env_row_above.f
     end
-    normE = norm(Env)
-    return Environment(Env/normE, log(normE)+norm_shift)
+    
+    normE = maximum(abs.(reshape(Array(Env[1], inds(Env[1])), :)))
+    return Environment(Env./normE, length(Env)*log(normE)+norm_shift)
 end
 
 # returns the exact inner product of 2 peps (only used for testing purposes)
@@ -147,8 +151,8 @@ function inner_peps(psi::PEPS, psi2::PEPS)
     return x[1]
 end
 
-# calculates the gradient: d(<ψ|S>)/d(Θ) / <ψ>S>
-function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, logψ::Number; Ok::Vector=zeros(length(peps)))
+# calculates the gradient: d(<ψ|S>)/d(Θ) / <ψ|S>
+function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, logψ::Number; Ok::Vector=complex(zeros(length(peps))))
     pos = 1
     shift = 0
     for i in 1:size(peps)[1]
@@ -166,7 +170,7 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
 
             # lastly we reshape the tensor to a vector to obtain the gradient
             shift = prod(dim.(inds(Ok_Tensor)))
-            if S[i,j] == 0
+            if S[i,j] == 1
                 Ok[pos:pos+shift-1] = zeros(shift)
                 pos = pos+shift
                 Ok[pos:pos+shift-1] = reshape(Array(Ok_Tensor, inds(Ok_Tensor)), :)
@@ -206,8 +210,8 @@ end
 function generate_double_layer_env_row(peps_row, peps_row_above, contract_dim)
     indices_outer = Array{Index}(undef, length(peps_row))
     
-    bra = MPO(peps_row)
-    ket = copy(bra)
+    bra = conj(MPO(peps_row))
+    ket = MPO(peps_row)
      
     rename_indices!(ket)
     com_inds = commoninds.(peps_row, peps_row_above)
@@ -217,17 +221,16 @@ function generate_double_layer_env_row(peps_row, peps_row_above, contract_dim)
     
     E_mps = MPS((E_mpo.*combiner.(indices_outer, com_inds, tags="-1")).data)
     
-    normE = norm(E_mps)
-    
-    return Environment(E_mps/normE, log(normE))
+    normE = maximum(abs.(reshape(Array(E_mps[1], inds(E_mps[1])), :)))
+    return Environment(E_mps./normE, length(bra)*log(normE))
 end
 
 function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below, peps_double_env, contract_dim)
     C = Array{Array{ITensor}}(undef, 2)
     indices_outer = Array{Index}(undef, length(peps_row))
 
-    bra = MPO(peps_row)
-    ket = copy(bra)
+    bra = conj(MPO(peps_row))
+    ket = MPO(peps_row)
     
     rename_indices!(ket, indices_outer, commoninds.(peps_row, peps_row_above))
     C[1] = combiner.(indices_outer, commoninds.(peps_row, peps_row_above), tags="$(-1)")
@@ -242,9 +245,8 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
 
     E_mps = apply(E_mpo.*delta.(reduce(vcat, collect.(inds.(E_mpo, "1"))), reduce(vcat, collect.(inds.(peps_double_env.env, "-1")))), peps_double_env.env, maxdim=contract_dim)
 
-    normE = norm(E_mps)
-    
-    return Environment(E_mps/normE, log(normE)+peps_double_env.f)
+    normE = maximum(abs.(reshape(Array(E_mps[1], inds(E_mps[1])), :)))
+    return Environment(E_mps./normE, length(bra)*log(normE)+peps_double_env.f)
 end
 
 # calculates the field double_layer_envs and the norm of peps
@@ -273,7 +275,7 @@ function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
     bra = MPO(peps[row])
     ket = copy(bra)
 
-    if row != 1
+    if row != 1      
         bra = apply(bra, env_top[row-1].env, maxdim=peps.sample_dim)
         ket = apply(ket, env_top[row-1].env, maxdim=peps.sample_dim)
     end
@@ -282,7 +284,7 @@ function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
     if row != size(peps)[1]
         rename_indices!(ket, indices_outer, commoninds.(peps[row], peps[row+1]))
     end
-    return bra, ket
+    return conj(bra), ket
 end
 
 # calculates the unsampled contractions along a row (from right to left the sites are contracted along the physical Index)
@@ -325,8 +327,10 @@ end
 
 # samples from P_S and updates pc
 function sample_PS!(P_S, pc)
-    p0 = P_S[1,1]
-    p1 = P_S[2,2]
+    p0 = abs(P_S[1,1])
+    p1 = abs(P_S[2,2])
+    
+    @assert imag(P_S[1,1]) < real(P_S[1,1])*10^(-6)
     if rand() < p0/(p0+p1)
         pc += log(p0/(p0+p1))
         return p0/(p0+p1), 0, pc
@@ -382,14 +386,14 @@ function get_sample(peps::PEPS)
         bra = bra.*[ITensor([(S[row,i]+1)%2, S[row,i]], inds(bra[i], "phys_$(i)_$(row)")) for i in 1:size(peps)[2]]
             
         if row != size(peps)[1]
-            norm_bra = norm(bra)
+            norm_bra = maximum(abs.(reshape(Array(bra[1], inds(bra[1])), :)))
             if row == 1
-                env_top[row] = Environment(MPS(bra.data)/norm_bra, log(norm_bra)) 
+                env_top[row] = Environment(MPS(bra.data)./norm_bra, length(bra)*log(norm_bra)) 
             else
-                env_top[row] = Environment(bra/norm_bra, log(norm_bra)+env_top[row-1].f)
+                env_top[row] = Environment(bra./norm_bra, length(bra)*log(norm_bra)+env_top[row-1].f)
             end
         else
-            psi_S = 2*real(log(Complex(contract(bra)[1])) + (env_top[row-1].f))
+            psi_S = 2*real(log(Complex(contract(bra)[1])) + env_top[row-1].f)
         end
     end
     
@@ -621,7 +625,7 @@ function get_Ek(peps::PEPS, ham::OpSum, env_top::Vector{Environment}, env_down::
 
         # calculate the Energy contribution of the specific term and add it to the total Ek
         Ek_i, f = get_term(peps, env_top, env_down, S, key, h_envs)
-        Ek += abs(Ek_i)*exp(f-logψ)*terms[key]     # abs??   
+        Ek += (Ek_i)*exp(f-logψ)*terms[key]     # abs??   
     end
     
     # same for non-horizontal terms
@@ -632,7 +636,8 @@ function get_Ek(peps::PEPS, ham::OpSum, env_top::Vector{Environment}, env_down::
         end
         
         Ek_i, f = get_4body_term(peps, env_top, env_down, S, key, h_envs)
-        Ek += abs(Ek_i)*exp(f-logψ)*terms[key]     # abs??   
+        Ek += (Ek_i)*exp(f-logψ)*terms[key]     # abs??   
     end
+    
     return Ek
 end
