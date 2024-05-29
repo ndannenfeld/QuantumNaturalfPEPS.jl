@@ -211,7 +211,7 @@ function generate_double_layer_env_row(peps_row, peps_row_above, contract_dim)
     indices_outer = Array{Index}(undef, length(peps_row))
     
     bra = conj(MPO(peps_row))
-    ket = MPO(peps_row)
+    ket = copy(MPO(peps_row))
      
     rename_indices!(ket)
     com_inds = commoninds.(peps_row, peps_row_above)
@@ -230,7 +230,7 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
     indices_outer = Array{Index}(undef, length(peps_row))
 
     bra = conj(MPO(peps_row))
-    ket = MPO(peps_row)
+    ket = copy(MPO(peps_row))
     
     rename_indices!(ket, indices_outer, commoninds.(peps_row, peps_row_above))
     C[1] = combiner.(indices_outer, commoninds.(peps_row, peps_row_above), tags="$(-1)")
@@ -308,6 +308,7 @@ end
 # returns the 2x2 matrix P_S which is needed to sample from. Also updates sigma (used to store the contraction of already sampled sites from the left edge to the current site)
 function get_PS(bra, ket, peps, row, i, E, indices_outer, sigma)
     ket[i] = delta(inds(ket[i], "phys_$(i)_$(row)"), Index(2, "ket_phys"))*ket[i]
+   
     if row != size(peps)[1]
         C = combiner(indices_outer[i], commoninds(peps[row,i], peps[row+1,i]), tags = "1")
         sigma_1 = bra[i]*ket[i]*C*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*peps.double_layer_envs[row].env[i]
@@ -315,13 +316,16 @@ function get_PS(bra, ket, peps, row, i, E, indices_outer, sigma)
         sigma_1 = bra[i]*ket[i]
     end
 
+    
     if i == 1
         P_S = contract(E[i]*sigma_1)
     elseif i == size(peps)[2]
         P_S = contract(sigma*sigma_1)
     else
-        P_S = contract(sigma*E[i]*sigma_1)
-    end  
+        P_S = contract(sigma*E[i])
+        P_S = contract(P_S*sigma_1)
+    end 
+    
     return P_S, sigma_1
 end
 
@@ -329,8 +333,8 @@ end
 function sample_PS!(P_S, pc)
     p0 = abs(P_S[1,1])
     p1 = abs(P_S[2,2])
-    
-    @assert imag(P_S[1,1]) < real(P_S[1,1])*10^(-6)
+   
+    @assert imag(P_S[1,1]) < 10e-6
     if rand() < p0/(p0+p1)
         pc += log(p0/(p0+p1))
         return p0/(p0+p1), 0, pc
@@ -641,3 +645,42 @@ function get_Ek(peps::PEPS, ham::OpSum, env_top::Vector{Environment}, env_down::
     
     return Ek
 end
+
+# Calculates the Energy and Gradient of a given peps and hamiltonian
+function Ok_and_Ek(peps, ham; kwargs...)
+     
+        S,pc,psi_S,et = get_sample(peps) # draw a sample
+        logψ, et, ed = get_logψ_and_envs(peps, S) # compute the environments of the peps according to that sample
+        E_loc = get_Ek(peps, ham, et, ed, S, logψ) # compute the local energy
+        grad = get_Ok(peps, et, ed, S, logψ) # compute the gradient
+    
+    return grad, E_loc, logψ, S, pc, psi_S
+end
+
+# this function returns a Ok_and_Eks function wich can be used to optimise via QNG.evolve
+function generate_Oks_and_Eks(peps::PEPS, ham; kwargs...)
+    
+    # The central function is Oks and Eks
+    function Oks_and_Eks(Θ::Vector, sample_nr::Integer)
+        grad = Matrix{ComplexF64}(undef, sample_nr, length(Θ))
+        E_loc = Vector{ComplexF64}(undef, sample_nr)
+        logψ = Vector{ComplexF64}(undef, sample_nr)
+        S = Vector{Matrix{Int}}(undef, sample_nr)
+        pc = zeros(sample_nr)
+        psi_S = zeros(sample_nr)
+        
+        write!(peps, Θ)
+        update_double_layer_envs!(peps) # update the double layer environments once for the peps 
+        for i in 1:sample_nr
+            grad[i,:], E_loc[i], logψ[i], S[i], pc[i], psi_S[i] =  Ok_and_Ek(peps, ham;kwargs...)
+        end
+        
+        Z = 1/sample_nr * sum(exp.(psi_S - pc))
+        p = (exp.(psi_S) ./Z) ./ exp.(pc) # determine the estimate for pc given the samples drawn
+        
+        return grad, E_loc, logψ, S, p
+        # returns Gradient, local Energy, log(<ψ|S>), samples S, p
+    end
+    return Oks_and_Eks
+end
+
