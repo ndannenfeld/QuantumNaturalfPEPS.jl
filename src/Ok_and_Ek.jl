@@ -1,16 +1,22 @@
 # Calculates the Energy and Gradient of a given peps and hamiltonian
-function Ok_and_Ek(peps, ham; kwargs...)
+function Ok_and_Ek(peps, ham_op; kwargs...)
      
     S, pc, psi_S, et = get_sample(peps) # draw a sample
     logψ, et, ed = get_logψ_and_envs(peps, S) # compute the environments of the peps according to that sample
-    E_loc = get_Ek(peps, ham, et, ed, S, logψ) # compute the local energy
+    E_loc = get_Ek(peps, ham_op, et, ed, S, logψ) # compute the local energy
     grad = get_Ok(peps, et, ed, S, logψ) # compute the gradient
 
     return grad, E_loc, logψ, S, pc, psi_S
 end
 
+function generate_Oks_and_Eks(peps::PEPS, ham::OpSum; kwargs...)
+    hilbert = siteinds(peps)
+    ham_op = TensorOperatorSum(ham, hilbert)
+    return generate_Oks_and_Eks(peps, ham_op; kwargs...)
+end
+
 # this function returns a Ok_and_Eks function wich can be used to optimise via QNG.evolve
-function generate_Oks_and_Eks(peps::PEPS, ham; kwargs...)
+function generate_Oks_and_Eks(peps::PEPS, ham_op::TensorOperatorSum; kwargs...)
 
     # The central function is Oks and Eks
     function Oks_and_Eks(Θ::Vector, sample_nr::Integer)
@@ -24,7 +30,7 @@ function generate_Oks_and_Eks(peps::PEPS, ham; kwargs...)
         write!(peps, Θ)
         update_double_layer_envs!(peps) # update the double layer environments once for the peps 
         for i in 1:sample_nr
-            grad[i,:], E_loc[i], logψ[i], S[i], pc[i], psi_S[i] = Ok_and_Ek(peps, ham; kwargs...)
+            grad[i,:], E_loc[i], logψ[i], S[i], pc[i], psi_S[i] = Ok_and_Ek(peps, ham_op; kwargs...)
         end
         
         # TODO: unstable and incorrect

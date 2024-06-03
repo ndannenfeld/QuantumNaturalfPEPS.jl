@@ -17,7 +17,7 @@ mutable struct PEPS
     PEPS(tensors, bond_dim; norm=0, sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim) = new(tensors, [Environment(MPS(), 1) for i in 1:size(tensors)[1]-1], norm, bond_dim, sample_dim, contract_dim, double_contract_dim)
 end
 
-Base.size(peps::PEPS) = size(peps.tensors)
+Base.size(peps::PEPS, args...) = size(peps.tensors, args...)
 Base.getindex(peps::PEPS, i::Int) = peps.tensors[i, :]
 Base.getindex(peps::PEPS, i::Int, j::Int) = peps.tensors[i, j] # You can use peps[i, j]
 Base.setindex!(peps::PEPS, v, i::Int, j::Int) = (peps.tensors[i, j] = v)
@@ -26,8 +26,8 @@ Base.show(io::IO, peps::PEPS) = print(io, "PEPS(L=$(size(peps)), bond_dim=$(peps
 function flatten(peps::PEPS) # Flattens the tensors into a vector
     θ = ComplexF64[]
     # TODO: Slow, first calculate the length and then fill the vector
-    for i in 1:size(peps)[1]
-        for j in 1:size(peps)[2]
+    for i in 1:size(peps, 1)
+        for j in 1:size(peps, 2)
             append!(θ, reshape(Array(peps[i,j], inds(peps[i,j])), :))
         end
     end
@@ -38,8 +38,8 @@ Base.length(peps::PEPS) = length(flatten(peps)) # length(θ)
 
 function write!(peps::PEPS, θ::Vector{ComplexF64}) # Writes the vector θ into the tensors.
     pos = 1
-    for i in 1:size(peps)[1]
-        for j in 1:size(peps)[2]
+    for i in 1:size(peps, 1)
+        for j in 1:size(peps, 2)
             shift = prod(dim.(inds(peps[i,j])))
             peps[i, j] *= im # Why do we need this?
             peps[i, j][:] = reshape(θ[pos:(pos+shift-1)], dim.(inds(peps[i,j])))

@@ -64,11 +64,11 @@ end
 
 # calculates the field double_layer_envs and the norm of peps
 function update_double_layer_envs!(peps::PEPS)
-    indices_outer = Array{Index}(undef, size(peps)[2])
+    indices_outer = Array{Index}(undef, size(peps, 2))
         
     # for every row we calculate the double layer environment
-    peps.double_layer_envs[end] = generate_double_layer_env_row(peps[size(peps)[1]], peps[size(peps)[1]-1], peps.double_contract_dim)
-    for i in size(peps)[1]-1:-1:2
+    peps.double_layer_envs[end] = generate_double_layer_env_row(peps[size(peps, 1)], peps[size(peps, 1)-1], peps.double_contract_dim)
+    for i in size(peps, 1)-1:-1:2
         peps.double_layer_envs[i-1] = generate_double_layer_env_row(peps[i], peps[i-1], peps[i+1], peps.double_layer_envs[i], peps.double_contract_dim)
     end
 
@@ -94,7 +94,7 @@ function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
     end
     rename_indices!(ket)
     
-    if row != size(peps)[1]
+    if row != size(peps, 1)
         rename_indices!(ket, indices_outer, commoninds.(peps[row], peps[row+1]))
     end
     return conj(bra), ket
@@ -102,17 +102,17 @@ end
 
 # calculates the unsampled contractions along a row (from right to left the sites are contracted along the physical Index)
 function calculate_E!(bra, ket, peps, row, E, indices_outer)
-    if row != size(peps)[1]
-        C = combiner(indices_outer[end], commoninds(peps[row,size(peps)[2]], peps[row+1,size(peps)[2]]), tags = "1")
+    if row != size(peps, 1)
+        C = combiner(indices_outer[end], commoninds(peps[row,size(peps, 2)], peps[row+1,size(peps, 2)]), tags = "1")
         E[end] = contract(bra[end]*ket[end]*C*delta(inds(peps.double_layer_envs[row].env[end], "-1")[1], inds(C)[1])*peps.double_layer_envs[row].env[end])
 
-        for i in size(peps)[2]-1:-1:2
+        for i in size(peps, 2)-1:-1:2
             C = combiner(indices_outer[i], commoninds(peps[row,i], peps[row+1,i]), tags = "1")
             E[i-1] = contract(E[i]*bra[i]*ket[i]*C*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*peps.double_layer_envs[row].env[i])
         end
     else
         E[end] = contract(bra[end]*ket[end])
-        for i in size(peps)[2]-1:-1:2
+        for i in size(peps, 2)-1:-1:2
             E[i-1] = contract(E[i]*bra[i]*ket[i])
         end
     end
@@ -122,7 +122,7 @@ end
 function get_PS(bra, ket, peps, row, i, E, indices_outer, sigma)
     ket[i] = delta(inds(ket[i], "phys_$(i)_$(row)"), Index(2, "ket_phys"))*ket[i]
    
-    if row != size(peps)[1]
+    if row != size(peps, 1)
         C = combiner(indices_outer[i], commoninds(peps[row,i], peps[row+1,i]), tags = "1")
         sigma_1 = bra[i]*ket[i]*C*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*peps.double_layer_envs[row].env[i]
     else
@@ -132,7 +132,7 @@ function get_PS(bra, ket, peps, row, i, E, indices_outer, sigma)
     
     if i == 1
         P_S = contract(E[i]*sigma_1)
-    elseif i == size(peps)[2]
+    elseif i == size(peps, 2)
         P_S = contract(sigma*sigma_1)
     else
         P_S = contract(sigma*E[i])
@@ -167,19 +167,19 @@ end
 function get_sample(peps::PEPS)
     S = Array{Int64}(undef, size(peps))
     
-    indices_inner = Array{Index}(undef, size(peps)[2]-1)
-    indices_outer = Array{Index}(undef, size(peps)[2])
+    indices_inner = Array{Index}(undef, size(peps, 2)-1)
+    indices_outer = Array{Index}(undef, size(peps, 2))
     
-    E = Array{ITensor}(undef, size(peps)[2]-1)
+    E = Array{ITensor}(undef, size(peps, 2)-1)
     
-    env_top = Array{Environment}(undef, size(peps)[1]-1)
+    env_top = Array{Environment}(undef, size(peps, 1)-1)
     
     P_S = ITensor()
     
     psi_S = 0
     pc = 0
     # we loop through every row
-    for row in 1:size(peps)[1]
+    for row in 1:size(peps, 1)
         sigma = 1
         bra, ket = get_bra_ket!(peps, row, indices_outer, env_top)
         
@@ -187,7 +187,7 @@ function get_sample(peps::PEPS)
         calculate_E!(bra, ket, peps, row, E, indices_outer)
 
         # then we loop through the different sites in one row
-        for i in 1:size(peps)[2]
+        for i in 1:size(peps, 2)
             
             # calculate the 2x2 matrix from which we sample
             P_S, sigma_1 = get_PS(bra, ket, peps, row, i, E, indices_outer, sigma)
@@ -200,9 +200,9 @@ function get_sample(peps::PEPS)
         end
         
         # the sampled bra is used to generate the top environments
-        bra = bra.*[ITensor([(S[row,i]+1)%2, S[row,i]], inds(bra[i], "phys_$(i)_$(row)")) for i in 1:size(peps)[2]]
+        bra = bra.*[ITensor([(S[row,i]+1)%2, S[row,i]], inds(bra[i], "phys_$(i)_$(row)")) for i in 1:size(peps, 2)]
             
-        if row != size(peps)[1]
+        if row != size(peps, 1)
             norm_bra = maximum(abs.(reshape(Array(bra[1], inds(bra[1])), :)))
             if row == 1
                 env_top[row] = Environment(MPS(bra.data)./norm_bra, length(bra)*log(norm_bra)) 
