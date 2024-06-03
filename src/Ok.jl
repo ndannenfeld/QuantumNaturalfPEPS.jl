@@ -16,17 +16,18 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
             end
 
             # lastly we reshape the tensor to a vector to obtain the gradient
+            # TODO: Does this still work for phys_dim!=2?
             shift = prod(dim.(inds(Ok_Tensor)))
             if S[i,j] == 1
                 # Fill with zeros instead
-                Ok[pos:pos+shift-1] = zeros(shift)
+                Ok[pos:pos+shift-1] .= 0
                 pos = pos+shift
-                # TODO Reduce copys by using a view
+                # TODO Reduce copys by not using Array, make sure that the indices are in the same order as the corresponding peps tensor
                 Ok[pos:pos+shift-1] = reshape(Array(Ok_Tensor, inds(Ok_Tensor)), :)
             else
                 Ok[pos:pos+shift-1] = reshape(Array(Ok_Tensor, inds(Ok_Tensor)), :)
                 pos = pos+shift
-                Ok[pos:pos+shift-1] = zeros(shift)
+                Ok[pos:pos+shift-1] .= 0
             end
             pos = pos+shift
         end

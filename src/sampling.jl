@@ -64,14 +64,9 @@ end
 
 # calculates the field double_layer_envs and the norm of peps
 function update_double_layer_envs!(peps::PEPS)
-    indices_outer = Array{Index}(undef, size(peps, 2))
-        
-    # for every row we calculate the double layer environment
-    peps.double_layer_envs[end] = generate_double_layer_env_row(peps[size(peps, 1)], peps[size(peps, 1)-1], peps.double_contract_dim)
-    for i in size(peps, 1)-1:-1:2
-        peps.double_layer_envs[i-1] = generate_double_layer_env_row(peps[i], peps[i-1], peps[i+1], peps.double_layer_envs[i], peps.double_contract_dim)
-    end
+    peps.double_layer_envs = generate_double_layer_envs(peps)
 
+    # TODO do we need this?
     # We also calculate the (log-)norm of the peps as it is used in get_sample to calculate p_c
     E_mpo = generate_double_layer_env_row(peps[1], peps[2], peps.double_contract_dim)
     E_mpo.env = E_mpo.env .*delta.(reduce(vcat, collect.(inds.(E_mpo.env, "-1"))), reduce(vcat, collect.(inds.(peps.double_layer_envs[1].env, "-1"))))
@@ -81,6 +76,16 @@ function update_double_layer_envs!(peps::PEPS)
     end
 
     peps.norm = real(log(Complex(contract(E_mpo.env)[1])))+(peps.double_layer_envs[1].f + E_mpo.f)    
+end
+
+function generate_double_layer_envs(peps::PEPS)
+    double_layer_envs = Vector{Environment}(undef, size(peps, 1) - 1)
+    # for every row we calculate the double layer environment
+    double_layer_envs[end] = generate_double_layer_env_row(peps[size(peps, 1)], peps[size(peps, 1)-1], peps.double_contract_dim)
+    for i in size(peps, 1)-1:-1:2
+        double_layer_envs[i-1] = generate_double_layer_env_row(peps[i], peps[i-1], peps[i+1], double_layer_envs[i], peps.double_contract_dim)
+    end
+    return double_layer_envs
 end
 
 # calculates the bra and the ket layer and applies (if available) already sampled rows (from above)
