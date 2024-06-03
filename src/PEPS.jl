@@ -48,20 +48,29 @@ function write!(peps::PEPS, θ::Vector{ComplexF64}) # Writes the vector θ into 
     end
 end
 
+ITensors.siteinds(type, Lx, Ly) = [siteind(type; addtags="nx=$i,ny=$j") for i in 1:Lx, j in 1:Ly]
+siteinds_compat(phys_dim, Lx, Ly) = [Index(phys_dim, "phys_$(j)_$(i)") for i in 1:Lx, j in 1:Ly] # TO be removed
+
 # initializes a PEPS
-function PEPS(Lx::Int64, Ly::Int64, phys_dim::Int64, bond_dim::Int64)
-    tensors = Array{ITensor}(undef, Lx,Ly)
+function PEPS(type, Lx::Int64, Ly::Int64; kwargs...)
+    hilbert = siteinds(type, Lx, Ly)
+    return PEPS(hilbert, kwargs...)
+end
+
+function PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...)
+    Lx, Ly = size(hilbert)
+    tensors = Array{ITensor}(undef, Lx, Ly)
 
     # initializing bond indices
     indices = Array{Index{Int64}}(undef, (2*Lx*Ly - Lx - Ly))
     for i in 1:(2*Lx*Ly - Lx - Ly)
-        indices[i] = Index(bond_dim, "ind_$(i)")
+        indices[i] = Index(bond_dim, "Link,l=$(i)")
     end
     
     # filling the matrix of tensors with random ITensors wich share the same indices with their neighbours
     for i in 1:Ly
         for j in 1:Lx
-            phys_ind = Index(phys_dim, "phys_$(i)_$(j)")
+            phys_ind = hilbert[j, i]
             if i == 1
                 if j == 1
                     peps_tensor = randomITensor(indices[1], indices[Ly*(Lx-1)+1], phys_ind)
@@ -87,11 +96,20 @@ function PEPS(Lx::Int64, Ly::Int64, phys_dim::Int64, bond_dim::Int64)
             end
             
             tensors[j, i] = peps_tensor
-            
         end
     end
     
-    return PEPS(tensors, bond_dim)
+    return PEPS(tensors, bond_dim, kwargs...)
+end
+
+function ITensors.siteind(peps::PEPS, i, j)
+    # TODO
+    return 
+end
+function ITensors.siteinds(peps::PEPS)
+    # TODO: Get the indices of the PEPS instead of generating new ones (see ITensors/src/ITensorMPS/abstractmps.jl:620
+    hilbert = siteinds("S=1/2", size(peps, 1), size(peps, 2))
+    return hilbert
 end
 
 # returns the exact inner product of 2 peps (only used for testing purposes)
