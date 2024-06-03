@@ -5,6 +5,11 @@ using Statistics
 using QuantumNaturalGradient
 
 include("PEPS.jl")
+include("sampling.jl")
+include("logpsi.jl")
+include("Ok.jl")
+include("Ek.jl")
+include("Ok_and_Ek.jl")
 
 export PEPS
 export flatten
