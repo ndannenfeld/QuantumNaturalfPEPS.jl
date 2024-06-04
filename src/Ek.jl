@@ -159,7 +159,7 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
 end
 
 # same as get_4body_term but for horizontal terms
-function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, key, h_envs)
+function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, key, h_envs)
     f = 0
     
     x = key[1][1][1]

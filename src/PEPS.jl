@@ -39,6 +39,7 @@ function Base.getproperty(x::PEPS, y::Symbol)
     end
 end
 
+Base.convert(::Type{Vector}, peps::PEPS) = flatten(peps)
 function flatten(peps::PEPS) # Flattens the tensors into a vector
     type = eltype(peps)
     θ = type[]
@@ -50,6 +51,7 @@ function flatten(peps::PEPS) # Flattens the tensors into a vector
     end
     return θ
 end
+
 
 Base.length(peps::PEPS) = length(flatten(peps)) # length(θ) # TODO: Write a more efficient version
 

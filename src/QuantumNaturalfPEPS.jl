@@ -2,6 +2,7 @@ module QuantumNaturalfPEPS
 
 using ITensors
 using Statistics
+using TimerOutputs
 using QuantumNaturalGradient: TensorOperatorSum
 using QuantumNaturalGradient
 
