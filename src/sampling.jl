@@ -66,7 +66,7 @@ end
 function update_double_layer_envs!(peps::PEPS)
     peps.double_layer_envs = generate_double_layer_envs(peps)
 
-    # TODO do we need this?
+    # TODO do we need to calculate the norm of the peps here?
     # We also calculate the (log-)norm of the peps as it is used in get_sample to calculate p_c
     E_mpo = generate_double_layer_env_row(peps[1], peps[2], peps.double_contract_dim)
     E_mpo.env = E_mpo.env .*delta.(reduce(vcat, collect.(inds.(E_mpo.env, "-1"))), reduce(vcat, collect.(inds.(peps.double_layer_envs[1].env, "-1"))))
@@ -152,7 +152,7 @@ function sample_PS!(P_S, pc)
     p0 = abs(P_S[1,1])
     p1 = abs(P_S[2,2])
    
-    @assert imag(P_S[1,1]) < 10e-6
+    @assert imag(P_S[1,1]) < 1e-6
     if rand() < p0/(p0+p1)
         pc += log(p0/(p0+p1))
         return p0/(p0+p1), 0, pc
@@ -189,13 +189,13 @@ function get_sample(peps::PEPS)
         bra, ket = get_bra_ket!(peps, row, indices_outer, env_top)
         
         # we then calculate the unsampled environment (in one row)
-        calculate_E!(bra, ket, peps, row, E, indices_outer)
+        calculate_E!(bra, ket, peps, row, E, indices_outer) # TODO: Better name for calculate_E
 
         # then we loop through the different sites in one row
         for i in 1:size(peps, 2)
             
             # calculate the 2x2 matrix from which we sample
-            P_S, sigma_1 = get_PS(bra, ket, peps, row, i, E, indices_outer, sigma)
+            P_S, sigma_1 = get_PS(bra, ket, peps, row, i, E, indices_outer, sigma) # TODO: Maybe rename function to get_reduced_ρ?
             
             # sample from P_S
             norm_factor, S[row,i], pc = sample_PS!(P_S, pc)

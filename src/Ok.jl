@@ -16,7 +16,7 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
             end
 
             # lastly we reshape the tensor to a vector to obtain the gradient
-            # TODO: Does this still work for phys_dim!=2?
+            # TODO: Does this still work for phys_dim!=2? Possible bug waiting to happen, let's discuss!
             shift = prod(dim.(inds(Ok_Tensor)))
             if S[i,j] == 1
                 # Fill with zeros instead

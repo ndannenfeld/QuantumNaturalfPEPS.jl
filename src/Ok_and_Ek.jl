@@ -33,7 +33,7 @@ function generate_Oks_and_Eks(peps::PEPS, ham_op::TensorOperatorSum; kwargs...)
             grad[i,:], E_loc[i], logψ[i], S[i], pc[i], psi_S[i] = Ok_and_Ek(peps, ham_op; kwargs...)
         end
         
-        # TODO: unstable and incorrect
+        # TODO: what is psi_S?
         Z = 1/sample_nr * sum(exp.(psi_S - pc))
         p = (exp.(psi_S) ./Z) ./ exp.(pc) # determine the estimate for pc given the samples drawn
         

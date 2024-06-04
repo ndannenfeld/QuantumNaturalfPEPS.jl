@@ -40,7 +40,7 @@ function Base.getproperty(x::PEPS, y::Symbol)
 end
 
 function flatten(peps::PEPS) # Flattens the tensors into a vector
-    type = eltype(peps.tensors[1,1])
+    type = eltype(peps)
     θ = type[]
     # TODO: Slow, first calculate the length and then fill the vector
     for i in 1:size(peps, 1)
@@ -124,11 +124,12 @@ function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwarg
 end
 
 function ITensors.siteind(peps::PEPS, i, j)
-    # TODO
+    # TODO: Get the indices from the PEPS instead of generating new ones (see ITensors/src/ITensorMPS/abstractmps.jl:620
     return 
 end
 function ITensors.siteinds(peps::PEPS)
-    # TODO: Get the indices from the PEPS instead of generating new ones (see ITensors/src/ITensorMPS/abstractmps.jl:620
+    # TODO: Replace with the following line
+    #hilbert = [siteind(peps, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
     hilbert = siteinds("S=1/2", size(peps, 1), size(peps, 2))
     return hilbert
 end
