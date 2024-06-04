@@ -14,7 +14,7 @@ mutable struct PEPS
     sample_dim::Integer
     contract_dim::Integer
     double_contract_dim::Integer
-    PEPS(tensors, bond_dim; norm=0, sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim) = new(tensors, nothing, norm, bond_dim, sample_dim, contract_dim, double_contract_dim)
+    PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; norm=0, sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim) = new(tensors, nothing, norm, bond_dim, sample_dim, contract_dim, double_contract_dim)
 end
 
 Base.size(peps::PEPS, args...) = size(peps.tensors, args...)
@@ -120,7 +120,7 @@ function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwarg
         end
     end
     
-    return PEPS(tensors, bond_dim, kwargs...)
+    return PEPS(tensors, bond_dim; kwargs...)
 end
 
 function ITensors.siteind(peps::PEPS, i, j)
