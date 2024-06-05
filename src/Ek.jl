@@ -212,6 +212,7 @@ function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environme
     
     # sorts the dictionary into the different categories
     horizontal, vertical, fourBody = sort_dict(terms, vertical=false)
+    #TODO: add a warning if there are terms that are not horizontal, vertical or 4body and then use the slow method
 
     # loop through every horizontal components
     for key in horizontal

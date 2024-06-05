@@ -104,8 +104,18 @@ function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_w
     return Eks, Oks, logψs, samples, weights
 end
 
-#### Multiprocessing todo
-function Oks_and_Eks_multiproc(peps, sample_nr; Oks=nothing, importance_weights=true, 
+#### Multiprocessing
+
+function generate_Oks_and_Eks_multiproc(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), threaded=true, kwargs...)
+    function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer) where T
+        write!(peps, Θ)
+        @timeit timer "double_layer_envs" update_double_layer_envs!(peps) # update the double layer environments once for the peps
+        return Oks_and_Eks_multiproc(peps, ham_op, sample_nr; kwargs...)
+    end
+    return Oks_and_Eks_
+end
+
+function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_weights=true, 
                                n_threads=Distributed.remotecall_fetch(()->Threads.nthreads(), workers()[1]))
 
     nr_procs = length(workers())
@@ -113,6 +123,8 @@ function Oks_and_Eks_multiproc(peps, sample_nr; Oks=nothing, importance_weights=
     k_thread = ceil(Int, k / n_threads)
     k_eff = k_thread * n_threads
     sample_nr_eff = k_eff * nr_procs
+    nr_parameters = length(peps)
+    # TODO: Send ham_op only once through the network
     out = [Distributed.remotecall(() -> Oks_and_Eks_threaded(peps, ham_op, k; importance_weights=false), w) for w in workers()]
     
     eltype_ = eltype(peps)
@@ -120,7 +132,7 @@ function Oks_and_Eks_multiproc(peps, sample_nr; Oks=nothing, importance_weights=
     
     samples = Vector{Any}(undef, sample_nr_eff)
     Eks = Vector{eltype_}(undef, sample_nr_eff)
-    logψs = Vector{eltype_real}(undef, sample_nr_eff)
+    logψs = Vector{Complex{eltype_real}}(undef, sample_nr_eff)
     logpcs = Vector{eltype_real}(undef, sample_nr_eff)
     
     if Oks === nothing
