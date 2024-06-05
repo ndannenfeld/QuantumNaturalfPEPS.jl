@@ -2,6 +2,7 @@
 function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, logψ::Number; Ok::Vector=complex(zeros(length(peps))))
     pos = 1
     shift = 0
+    # TODO: I do not understand the code, where are the left enviroments computed? Can we reuse the enviroments from horizonatal_EK?
     for i in 1:size(peps, 1)
         for j in 1:size(peps, 2)
             # peps_S gives an array of ITensors wich are peps[i,y]*S[i,y] for all tensors in the row except for i,j
@@ -16,7 +17,7 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
             end
 
             # lastly we reshape the tensor to a vector to obtain the gradient
-            # TODO: Does this still work for phys_dim!=2? Possible bug waiting to happen, let's discuss!
+            # TODO: Does this still work for phys_dim!=2? Possible bug waiting to happen, use the permute_and_copy! function I added to tensor_ops.jl
             shift = prod(dim.(inds(Ok_Tensor)))
             if S[i,j] == 1
                 # Fill with zeros instead
