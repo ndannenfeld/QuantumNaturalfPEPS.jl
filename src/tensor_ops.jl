@@ -10,7 +10,7 @@ permute_and_copy!(dest, tensor::ITensor, target_indices) = permute_and_copy!(des
 
 function permute_and_copy!(dest, tensor::NDTensors.DenseTensor, target_indices)
     perm = NDTensors.getperm(target_indices, inds(tensor))
-    s = reshape(tensor.storage, size(t))
+    s = reshape(tensor.storage, size(tensor))
     return permutedims!(dest, s, perm)
 end
 

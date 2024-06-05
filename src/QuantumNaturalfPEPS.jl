@@ -12,6 +12,7 @@ include("logpsi.jl")
 include("Ok.jl")
 include("Ek.jl")
 include("Ok_and_Ek.jl")
+include("tensor_ops.jl")
 
 export PEPS
 export flatten
