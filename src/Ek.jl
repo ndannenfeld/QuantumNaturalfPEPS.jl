@@ -5,7 +5,7 @@ function sort_dict(terms; vertical=true)
     hor = Vector{Any}()
     vert = Vector{Any}()
     four = Vector{Any}()
-    
+    # TODO: If you do not save the value of the key, how is it possible that future functions now the value?
     # loop through every term
     for key in keys(terms)
         if length(key) == 1     # one spin flip is considered a horizontal
