@@ -21,6 +21,7 @@ include("Ok.jl")
 include("Ek.jl")
 include("Ok_and_Ek.jl")
 include("Oks_and_Eks.jl")
+include("SerializationPatch.jl")
 
 
 export PEPS
