@@ -21,16 +21,21 @@ function patch_serialization()
     @eval Serialization function register_deserialization_array!(worker_id::Int, x)
         if !isdefined(Serialization, :deserialization_array)
             @eval Serialization deserialization_array = Dict()
+            @eval Serialization deserialization_array_lock = ReentrantLock()
         end
         elty = eltype(x)
         dims = size(x)
-        Serialization.deserialization_array[(worker_id, elty, dims)] = x
+        lock(Serialization.deserialization_array_lock) do
+            Serialization.deserialization_array[(worker_id, elty, dims)] = x
+        end
     end
 
     @eval Serialization function deregister_deserialization_array!(worker_id::Int, x)
         elty = eltype(x)
         dims = size(x)
-        delete!(Serialization.deserialization_array, (worker_id, elty, dims))
+        lock(Serialization.deserialization_array_lock) do
+            delete!(Serialization.deserialization_array, (worker_id, elty, dims))
+        end
     end
 
     @eval Serialization function retrieve_if_in_memory(s::AbstractSerializer, elty, dims)
@@ -38,7 +43,9 @@ function patch_serialization()
             id = (s.pid, elty, dims)
             if id in keys(Serialization.deserialization_array)
                 A = Serialization.deserialization_array[id]
-                delete!(Serialization.deserialization_array, id)
+                lock(Serialization.deserialization_array_lock) do
+                    delete!(Serialization.deserialization_array, id)
+                end
                 return A
             end
         end
@@ -56,7 +63,10 @@ function patch_serialization()
         end
         if isa(d1, Int32) || isa(d1, Int64)
             if elty !== Bool && isbitstype(elty)
-                a = Vector{elty}(undef, d1)
+                ########## Modified Code
+                #a = Vector{elty}(undef, d1)
+                a = retrieve_if_in_memory(s, elty, (d1,))
+                ##########
                 s.table[slot] = a
                 return read!(s.io, a)
             end
