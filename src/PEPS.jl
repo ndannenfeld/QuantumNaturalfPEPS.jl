@@ -1,15 +1,6 @@
-# the entries of the environments are all normalized by the absolute value of the biggest entrie of the first ITensor
-# to get the true environtment: contract with the MPS and afterwards multiply by exp(f)
-mutable struct Environment
-    env::MPS
-    f::ComplexF64 # TODO: Why is this complex?
-    Environment(env, f) = new(env, f)
-end
-getindex(env::Environment, i::Int) = env.env[i]
-
 mutable struct PEPS
     tensors::Matrix{ITensor}
-    double_layer_envs::Union{Vector{Environment}, Nothing}
+    double_layer_envs
     norm::Float64
     bond_dim::Integer
     sample_dim::Integer

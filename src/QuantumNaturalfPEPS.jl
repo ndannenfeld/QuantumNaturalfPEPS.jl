@@ -15,8 +15,8 @@ using QuantumNaturalGradient
 
 include("tensor_ops.jl")
 include("PEPS.jl")
+include("Environments.jl")
 include("sampling.jl")
-include("logpsi.jl")
 include("Ok.jl")
 include("Ek.jl")
 include("Ok_and_Ek.jl")
