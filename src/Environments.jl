@@ -13,10 +13,18 @@ mutable struct Environment
     Environment(env; kwargs...) = Environment(env, 0.0; kwargs...)
 end
 Base.getindex(env::Environment, i::Int) = env.env[i]
+Base.reverse(env::Environment) = ReverseEnvironment(env)
+
+struct ReverseEnvironment
+    env::Environment
+end
+Base.getindex(env::ReverseEnvironment, i::Int) = reverse(env).env[end-i+1]
+Base.getproperty(x::ReverseEnvironment, y::Symbol) = getproperty(reverse(x), y)
+Base.reverse(env::ReverseEnvironment) = getfield(env, :env)
 
 function normalize!(env::Environment)
     for env_i in env.env
-        norm = maximum(abs.(env_i)) # TODO: Replace with version that does not use abs
+        norm = max_norm(env_i)
         env_i ./= norm
         env.f += log(norm)
     end
