@@ -49,7 +49,7 @@ end
 
 # this function computes the horizontal environments for a given row
 function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs::Matrix{MPS})
-    peps_i = peps[i].*[ITensor([(S[i,k]+1)%2, S[i,k]], inds(peps[i,k], "phys_$(k)_$(i)")) for k in 1:size(peps, 2)]     #contract the row with S
+    peps_i = peps[i, :].*[ITensor([(S[i,k]+1)%2, S[i,k]], inds(peps[i,k], "phys_$(k)_$(i)")) for k in 1:size(peps, 2)]     #contract the row with S
     
     # now we loop through every site and compute the environments (once from the right and once from the left) by MPO-MPS contraction.
     if i == 1
@@ -84,8 +84,8 @@ end
 
 # same as above but for non-horizontal components
 function get_4body_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs::Matrix{MPS})
-    peps_i = peps[i].*[ITensor([(S[i,k]+1)%2, S[i,k]], inds(peps[i,k], "phys_$(k)_$(i)")) for k in 1:size(peps, 2)]
-    peps_j = peps[i+1].*[ITensor([(S[i+1,k]+1)%2, S[i+1,k]], inds(peps[i+1,k], "phys_$(k)_$(i+1)")) for k in 1:size(peps, 2)]
+    peps_i = peps[i, :].*[ITensor([(S[i,k]+1)%2, S[i,k]], inds(peps[i,k], "phys_$(k)_$(i)")) for k in 1:size(peps, 2)]
+    peps_j = peps[i+1, :].*[ITensor([(S[i+1,k]+1)%2, S[i+1,k]], inds(peps[i+1,k], "phys_$(k)_$(i+1)")) for k in 1:size(peps, 2)]
     
     if i == 1
         horizontal_envs[1,end] = MPS([peps_i[end],peps_j[end],env_down[end-1].env[end]])

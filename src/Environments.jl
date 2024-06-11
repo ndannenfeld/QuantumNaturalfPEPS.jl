@@ -43,18 +43,18 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, Env_top=Array{Environ
     out = Array{ComplexF64}(undef, 2)
     
     if overwrite
-        Env_top[1] = generate_env_row(peps[1], S[1,:], 1, peps.contract_dim)
+        Env_top[1] = generate_env_row(peps[1, :], S[1,:], 1, peps.contract_dim)
     end
-    Env_down[1] = generate_env_row(peps[size(S,1)], S[size(S,1),:], size(S,1), peps.contract_dim)
+    Env_down[1] = generate_env_row(peps[size(S,1), :], S[size(S,1),:], size(S,1), peps.contract_dim)
     
     # for every row we calculate the environments once from the top down and once from the bottom up
     for i in 2:size(S,1)-1
         i_prime = size(S,1)+1-i 
         
         if overwrite
-            Env_top[i] = generate_env_row(peps[i], S[i,:], i, peps.contract_dim, env_row_above = Env_top[i-1])
+            Env_top[i] = generate_env_row(peps[i, :], S[i,:], i, peps.contract_dim, env_row_above = Env_top[i-1])
         end
-        Env_down[i] = generate_env_row(peps[i_prime], S[i_prime,:], i_prime, peps.contract_dim, env_row_above = Env_down[i-1])
+        Env_down[i] = generate_env_row(peps[i_prime, :], S[i_prime,:], i_prime, peps.contract_dim, env_row_above = Env_down[i-1])
     end
     
     # once we calculated all environments we calculate <ψ|S> using the environments

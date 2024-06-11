@@ -68,7 +68,7 @@ function update_double_layer_envs!(peps::PEPS)
 
     # TODO do we need to calculate the norm of the peps here?
     # We also calculate the (log-)norm of the peps as it is used in get_sample to calculate p_c
-    E_mpo = generate_double_layer_env_row(peps[1], peps[2], peps.double_contract_dim)
+    E_mpo = generate_double_layer_env_row(peps[1, :], peps[2, :], peps.double_contract_dim)
     E_mpo.env = E_mpo.env .*delta.(reduce(vcat, collect.(inds.(E_mpo.env, "-1"))), reduce(vcat, collect.(inds.(peps.double_layer_envs[1].env, "-1"))))
     
     for i in 1:length(E_mpo.env)
@@ -81,16 +81,16 @@ end
 function generate_double_layer_envs(peps::PEPS)
     double_layer_envs = Vector{Environment}(undef, size(peps, 1) - 1)
     # for every row we calculate the double layer environment
-    double_layer_envs[end] = generate_double_layer_env_row(peps[size(peps, 1)], peps[size(peps, 1)-1], peps.double_contract_dim)
+    double_layer_envs[end] = generate_double_layer_env_row(peps[size(peps, 1), :], peps[size(peps, 1)-1, :], peps.double_contract_dim)
     for i in size(peps, 1)-1:-1:2
-        double_layer_envs[i-1] = generate_double_layer_env_row(peps[i], peps[i-1], peps[i+1], double_layer_envs[i], peps.double_contract_dim)
+        double_layer_envs[i-1] = generate_double_layer_env_row(peps[i, :], peps[i-1, :], peps[i+1, :], double_layer_envs[i], peps.double_contract_dim)
     end
     return double_layer_envs
 end
 
 # calculates the bra and the ket layer and applies (if available) already sampled rows (from above)
 function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
-    bra = MPO(peps[row])
+    bra = MPO(peps[row, :])
     ket = copy(bra)
 
     if row != 1      
@@ -100,7 +100,7 @@ function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
     rename_indices!(ket)
     
     if row != size(peps, 1)
-        rename_indices!(ket, indices_outer, commoninds.(peps[row], peps[row+1]))
+        rename_indices!(ket, indices_outer, commoninds.(peps[row, :], peps[row+1, :]))
     end
     return conj(bra), ket
 end

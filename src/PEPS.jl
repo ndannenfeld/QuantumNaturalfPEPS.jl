@@ -10,8 +10,7 @@ mutable struct PEPS
 end
 
 Base.size(peps::PEPS, args...) = size(peps.tensors, args...)
-Base.getindex(peps::PEPS, i::Int) = peps.tensors[i, :]
-Base.getindex(peps::PEPS, i::Int, j::Int) = peps.tensors[i, j] # You can use peps[i, j]
+Base.getindex(peps::PEPS, args...) = getindex(peps.tensors, args...)
 Base.setindex!(peps::PEPS, v, i::Int, j::Int) = (peps.tensors[i, j] = v)
 Base.show(io::IO, peps::PEPS) = print(io, "PEPS(L=$(size(peps)), bond_dim=$(peps.bond_dim), sample_dim=$(peps.sample_dim), contract_dim=$(peps.contract_dim), double_contract_dim=$(peps.double_contract_dim))")
 Base.eltype(peps::PEPS) = eltype(peps.tensors[1,1]) # TODO: Make sure that the code works for both complex and real numbers
