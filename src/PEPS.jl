@@ -5,6 +5,7 @@ mutable struct Environment
     f::ComplexF64 # TODO: Why is this complex?
     Environment(env, f) = new(env, f)
 end
+getindex(env::Environment, i::Int) = env.env[i]
 
 mutable struct PEPS
     tensors::Matrix{ITensor}
