@@ -63,11 +63,13 @@ ITensors.siteinds(type, Lx, Ly) = [siteind(type; addtags="nx=$i,ny=$j") for i in
 siteinds_compat(phys_dim, Lx, Ly) = [Index(phys_dim, "phys_$(j)_$(i)") for i in 1:Lx, j in 1:Ly] # TO be removed
 
 # initializes a PEPS
-PEPS(type, Lx::Int64, Ly::Int64; kwargs...) = PEPS(type, siteinds(type, Lx, Ly), kwargs...)
+PEPS(type, Lx::Int64, Ly::Int64; kwargs...) = PEPS(type, siteinds(type, Lx, Ly); kwargs...)
 function PEPS(::Type{S}, type, Lx::Int64, Ly::Int64; kwargs...) where {S<:Number}
     hilbert = siteinds(type, Lx, Ly)
-    return PEPS(S, hilbert, kwargs...)
+    return PEPS(S, hilbert; kwargs...)
 end
+
+PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
 
 PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim, kwargs...)
 
@@ -118,14 +120,31 @@ end
 
 function ITensors.siteind(peps::PEPS, i, j)
     # TODO: Get the indices from the PEPS instead of generating new ones (see ITensors/src/ITensorMPS/abstractmps.jl:620
-    return 
+    N = size(peps)
+     if N == [1,1] 
+        return firstind(M[1])
+     end
+     if N[1] == 1
+        return uniqueind(peps[i,j], peps[i,j%size(peps)[2] + 1], peps[i, (j-2+size(peps)[1])%size(peps)[2]+1])
+     end
+     if N[2] == 1 
+        return uniqueind(peps[i,j], peps[i%size(peps)[1]+1, j], peps[(i-2+size(peps)[1])%size(peps)[1]+1, j])
+     end
+        si = uniqueind(peps[i,j], peps[i%size(peps)[1]+1, j], peps[(i-2+size(peps)[1])%size(peps)[1]+1, j], peps[i,j%size(peps)[2] + 1], peps[i, (j-2+size(peps)[1])%size(peps)[2]+1])
+     return si
 end
+
+function linkinds(peps::PEPS, i,j)
+    return filter!(!=(siteind(peps,i,j)), collect(inds(peps[i,j])))
+end
+
 function ITensors.siteinds(peps::PEPS)
     # TODO: Replace with the following line
-    #hilbert = [siteind(peps, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
-    hilbert = siteinds("S=1/2", size(peps, 1), size(peps, 2))
+    hilbert = [siteind(peps, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
+    #hilbert = siteinds("S=1/2", size(peps, 1), size(peps, 2))
     return hilbert
 end
+
 
 # returns the exact inner product of 2 peps (only used for testing purposes)
 function inner_peps(psi::PEPS, psi2::PEPS)

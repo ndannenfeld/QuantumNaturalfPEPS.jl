@@ -125,7 +125,8 @@ end
 
 # returns the 2x2 matrix P_S which is needed to sample from. Also updates sigma (used to store the contraction of already sampled sites from the left edge to the current site)
 function get_PS(bra, ket, peps, row, i, E, indices_outer, sigma)
-    ket[i] = delta(inds(ket[i], "phys_$(i)_$(row)"), Index(2, "ket_phys"))*ket[i]
+   # ket[i] = delta(inds(ket[i], "phys_$(i)_$(row)"), Index(2, "ket_phys"))*ket[i]
+    ket[i] = delta(siteind(peps,row,i), Index(2, "ket_phys"))*ket[i]
    
     if row != size(peps, 1)
         C = combiner(indices_outer[i], commoninds(peps[row,i], peps[row+1,i]), tags = "1")
@@ -163,8 +164,8 @@ function sample_PS!(P_S, pc)
 end
 
 # after the sampling of the current site, it is fixed and its contraction with the aleady sampled sites is stored in sigma
-function update_sigma(sigma, sigma_1, S, i, row, norm_factor)
-    s = (sigma_1*sigma)* ITensor([(S+1)%2, S], inds(sigma_1, "phys_$(i)_$(row)"))
+function update_sigma(peps, sigma, sigma_1, S, i, row, norm_factor)
+    s = (sigma_1*sigma)* ITensor([(S+1)%2, S], siteind(peps, row, i))
     return (s)* ITensor([(S+1)%2, S], inds(sigma_1, "ket_phys")) / norm_factor
 end
 
@@ -201,11 +202,11 @@ function get_sample(peps::PEPS)
             norm_factor, S[row,i], pc = sample_PS!(P_S, pc)
             
             # store the contraction of sampled sites in sigma
-            sigma = update_sigma(sigma, sigma_1, S[row,i], i, row, norm_factor)                        
+            sigma = update_sigma(peps, sigma, sigma_1, S[row,i], i, row, norm_factor)                        
         end
         
         # the sampled bra is used to generate the top environments
-        bra = bra.*[ITensor([(S[row,i]+1)%2, S[row,i]], inds(bra[i], "phys_$(i)_$(row)")) for i in 1:size(peps, 2)]
+        bra = bra.*[ITensor([(S[row,i]+1)%2, S[row,i]], siteind(peps, row, i)) for i in 1:size(peps, 2)]
             
         if row != size(peps, 1)
             norm_bra = maximum(abs.(reshape(Array(bra[1], inds(bra[1])), :)))

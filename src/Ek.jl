@@ -5,7 +5,7 @@ function sort_dict(terms; vertical=true)
     hor = Vector{Any}()
     vert = Vector{Any}()
     four = Vector{Any}()
-    # TODO: If you do not save the value of the key, how is it possible that future functions now the value?
+    
     # loop through every term
     for key in keys(terms)
         if length(key) == 1     # one spin flip is considered a horizontal
@@ -47,74 +47,57 @@ function insert(arr, x)
     push!(arr,x)
 end
 
+function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_horizontal_envs::Array{ITensor}=Array{ITensor}(undef, size(peps,1), 2, size(peps, 2)-1))
+    for i in 1:size(peps,1)
+        get_horizontal_envs!(peps, env_top, env_down, S, i, @view all_horizontal_envs[i,:,:])
+    end
+    return all_horizontal_envs
+end
+
+function get_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs=Matrix{ITensor}(undef, 2,size(peps, 2)-1))
+    get_horizontal_envs!(peps, env_top, env_down,S,i,horizontal_envs)
+    return horizontal_envs
+end
+
 # this function computes the horizontal environments for a given row
-function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs::Matrix{MPS})
-    peps_i = peps[i, :].*[ITensor([(S[i,k]+1)%2, S[i,k]], inds(peps[i,k], "phys_$(k)_$(i)")) for k in 1:size(peps, 2)]     #contract the row with S
+function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs)
+    peps_i = peps[i,:].*[ITensor([(S[i,k]+1)%2, S[i,k]], siteind(peps,i,k)) for k in 1:size(peps, 2)]     #contract the row with S
     
     # now we loop through every site and compute the environments (once from the right and once from the left) by MPO-MPS contraction.
     if i == 1
-        horizontal_envs[1,end] = MPS([peps_i[end],env_down[end].env[end]])
-        horizontal_envs[2,1] = MPS([peps_i[1],env_down[end].env[1]])
-        for j in size(peps, 2)-1:-1:2
-            horizontal_envs[1,j-1] = apply(MPO([peps_i[j],env_down[end].env[j]]), horizontal_envs[1,j], maxdim = peps.contract_dim)
-        end
-        for j in 2:size(peps, 2)-1
-            horizontal_envs[2,j] = apply(MPO([peps_i[j],env_down[end].env[j]]), horizontal_envs[2,j-1], maxdim = peps.contract_dim)
-        end
+        contract_recursiv!(horizontal_envs, peps_i, env_down[end].env)
     elseif i == size(peps, 1)
-        horizontal_envs[1,end] = MPS([env_top[end].env[end], peps_i[end]])
-        horizontal_envs[2,1] = MPS([env_top[end].env[1], peps_i[1]])
-        for j in size(peps, 2)-1:-1:2
-            horizontal_envs[1,j-1] = apply(MPO([env_top[end].env[j], peps_i[j]]),horizontal_envs[1,j], maxdim = peps.contract_dim)
-        end
-        for j in 2:size(peps, 2)-1
-            horizontal_envs[2,j] = apply(MPO([env_top[end].env[j], peps_i[j]]),horizontal_envs[2,j-1], maxdim = peps.contract_dim)
-        end
+        contract_recursiv!(horizontal_envs, peps_i, env_top[end].env)
     else
-        horizontal_envs[1,end] = MPS([env_top[i-1].env[end],peps_i[end],env_down[end-i+1].env[end]])
-        horizontal_envs[2,1] = MPS([env_top[i-1].env[1],peps_i[1],env_down[end-i+1].env[1]])
-        for j in size(peps, 2)-1:-1:2
-            horizontal_envs[1,j-1] = apply(MPO([env_top[i-1].env[j],peps_i[j],env_down[end-i+1].env[j]]), horizontal_envs[1,j], maxdim = peps.contract_dim)
-        end
-        for j in 2:size(peps, 2)-1
-            horizontal_envs[2,j] = apply(MPO([env_top[i-1].env[j],peps_i[j],env_down[end-i+1].env[j]]),horizontal_envs[2,j-1], maxdim = peps.contract_dim)
-        end
+        contract_recursiv!(horizontal_envs, env_top[i-1].env, peps_i; c=env_down[end-i+1].env)
+    end
+end
+
+function contract_recursiv!(h_envs, a, b; c=ones(length(a)), d=ones(length(a)))
+    h_envs[1,end] = a[end]*b[end]*c[end]
+    h_envs[2,1] = a[1]*b[1]*c[1]
+    for j in length(a)-1:-1:2
+        h_envs[1,j-1] = h_envs[1,j]*a[j]*b[j]*c[j]
+    end
+    for j in 2:length(a)-1
+        h_envs[2,j] = h_envs[2,j-1]*a[j]*b[j]*c[j]
     end
 end
 
 # same as above but for non-horizontal components
-function get_4body_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs::Matrix{MPS})
-    peps_i = peps[i, :].*[ITensor([(S[i,k]+1)%2, S[i,k]], inds(peps[i,k], "phys_$(k)_$(i)")) for k in 1:size(peps, 2)]
-    peps_j = peps[i+1, :].*[ITensor([(S[i+1,k]+1)%2, S[i+1,k]], inds(peps[i+1,k], "phys_$(k)_$(i+1)")) for k in 1:size(peps, 2)]
+function get_4body_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs::Matrix{ITensor})
+    peps_i = peps[i,:].*[ITensor([(S[i,k]+1)%2, S[i,k]], siteind(peps,i,k)) for k in 1:size(peps, 2)]
+    peps_j = peps[i+1,:].*[ITensor([(S[i+1,k]+1)%2, S[i+1,k]], siteind(peps,i+1,k)) for k in 1:size(peps, 2)]
     
+    # now we loop through every site and compute the environments (once from the right and once from the left) by MPO-MPS contraction.
     if i == 1
-        horizontal_envs[1,end] = MPS([peps_i[end],peps_j[end],env_down[end-1].env[end]])
-        horizontal_envs[2,1] = MPS([peps_i[1],peps_j[1],env_down[end-1].env[1]])
-        for j in size(peps, 2)-1:-1:2
-            horizontal_envs[1,j-1] = apply(MPO([peps_i[j],peps_j[j],env_down[end-1].env[j]]), horizontal_envs[1,j], maxdim = peps.contract_dim)
-        end
-        for j in 2:size(peps, 2)-1
-            horizontal_envs[2,j] = apply(MPO([peps_i[j],peps_j[j],env_down[end-1].env[j]]), horizontal_envs[2,j-1], maxdim = peps.contract_dim)
-        end
+        contract_recursiv!(horizontal_envs, peps_i, peps_j, c=env_down[end-1].env)
     elseif i == size(peps, 1)-1
-        horizontal_envs[1,end] = MPS([env_top[end-1].env[end], peps_i[end], peps_j[end]])
-        horizontal_envs[2,1] = MPS([env_top[end-1].env[1], peps_i[1], peps_j[1]])
-        for j in size(peps, 2)-1:-1:2
-            horizontal_envs[1,j-1] = apply(MPO([env_top[end-1].env[j], peps_i[j], peps_j[j]]),horizontal_envs[1,j], maxdim = peps.contract_dim)
-        end
-        for j in 2:size(peps, 2)-1
-            horizontal_envs[2,j] = apply(MPO([env_top[end-1].env[j], peps_i[j], peps_j[j]]),horizontal_envs[2,j-1], maxdim = peps.contract_dim)
-        end
+        contract_recursiv!(horizontal_envs, peps_i, peps_j, c=env_top[end-1].env)
     else
-        horizontal_envs[1,end] = MPS([env_top[i-1].env[end],peps_i[end],peps_j[end],env_down[end-i].env[end]])
-        horizontal_envs[2,1] = MPS([env_top[i-1].env[1],peps_i[1],peps_j[1],env_down[end-i].env[1]])
-        for j in size(peps, 2)-1:-1:2
-            horizontal_envs[1,j-1] = apply(MPO([env_top[i-1].env[j],peps_i[j],peps_j[j],env_down[end-i].env[j]]), horizontal_envs[1,j], maxdim = peps.contract_dim)
-        end
-        for j in 2:size(peps, 2)-1
-            horizontal_envs[2,j] = apply(MPO([env_top[i-1].env[j],peps_i[j],peps_j[j],env_down[end-i].env[j]]),horizontal_envs[2,j-1], maxdim = peps.contract_dim)
-        end
+        contract_recursiv!(horizontal_envs, env_top[i-1].env, peps_i; c=peps_j, d=env_down[end-i].env)
     end
+
 end
 
 # a function that computes the contraction of the PEPS with one/two flipped spin(s) at a position specified in key
@@ -126,9 +109,9 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
     y = [key[1][1][2], key[2][1][2]]
     
     for i in 1:2
-        con = contract(con*peps[x[i],y[i]]*ITensor([S[x[i],y[i]], (S[x[i],y[i]]+1)%2], inds(peps[x[i],y[i]], "phys_$(y[i])_$(x[i])")))
+        con = contract(con*peps[x[i],y[i]]*ITensor([S[x[i],y[i]], (S[x[i],y[i]]+1)%2], siteind(peps,x[i],y[i])))
         if y[1] != y[2]
-            con = contract(con*peps[x[i],y[(i%2)+1]]*ITensor([(S[x[i],y[(i%2)+1]]+1)%2, S[x[i],y[(i%2)+1]]], inds(peps[x[i],y[(i%2)+1]], "phys_$(y[(i%2)+1])_$(x[i])")))
+            con = contract(con*peps[x[i],y[(i%2)+1]]*ITensor([(S[x[i],y[(i%2)+1]]+1)%2, S[x[i],y[(i%2)+1]]], siteind(peps,x[i],y[(i%2)+1])))
         end
     end
         
@@ -165,7 +148,7 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
     x = key[1][1][1]
     y = [key[1][1][2]]
     
-    flip = peps[x,y[1]]*ITensor([S[x,y[1]], (S[x,y[1]]+1)%2], inds(peps[x,y[1]], "phys_$(y[1])_$(x)"))
+    flip = peps[x,y[1]]*ITensor([S[x,y[1]], (S[x,y[1]]+1)%2], siteind(peps,x,y[1]))
     if x != size(peps, 1)
         flip = flip*env_down[end-x+1].env[y[1]]
         f += env_down[end-x+1].f
@@ -177,7 +160,7 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
     
     if length(key) == 2
         push!(y,key[2][1][2])
-        flip = flip*(peps[x,y[2]]*ITensor([S[x,y[2]], (S[x,y[2]]+1)%2], inds(peps[x,y[2]], "phys_$(y[2])_$(x)")))
+        flip = flip*(peps[x,y[2]]*ITensor([S[x,y[2]], (S[x,y[2]]+1)%2], siteind(peps,x,y[2])))
         if x != size(peps, 1)
             flip = flip*env_down[end-x+1].env[y[2]]
         end
@@ -197,10 +180,9 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
 end
 
 # computes the local energy <sample|H|ψ>/<sample|ψ>
-function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number)
+function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs::Array{ITensor})
     terms = QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, sample .+ 1; get_flip_sites=true)
     
-    h_envs = Matrix{MPS}(undef, 2,size(peps, 2)-1)
     row = 0
     Ek = 0
       
@@ -212,32 +194,30 @@ function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environme
     
     # sorts the dictionary into the different categories
     horizontal, vertical, fourBody = sort_dict(terms, vertical=false)
-    #TODO: add a warning if there are terms that are not horizontal, vertical or 4body and then use the slow method
 
     # loop through every horizontal components
     for key in horizontal
-        if key[1][1][1] != row  # because they are ordered we only need to calculate the horizontal environments once for every row
-            row = key[1][1][1]
-            get_horizontal_envs!(peps,env_top, env_down, sample, row, h_envs)
-        end
 
         # calculate the Energy contribution of the specific term and add it to the total Ek
-        Ek_i, f = get_term(peps, env_top, env_down, sample, key, h_envs)
-        Ek += (Ek_i)*exp(f-logψ)*terms[key]     # abs??   
+        Ek_i, f = get_term(peps, env_top, env_down, sample, key, h_envs[key[1][1][1], :, :])
+        Ek += (Ek_i)*exp(f-logψ)*terms[key]  
     end
     
     # same for non-horizontal terms
+    h_envs_4b = Matrix{ITensor}(undef, 2, size(peps,2)-1)
     for key in fourBody
         if minimum([key[1][1][1],key[2][1][1]]) != row  
             row = minimum([key[1][1][1],key[2][1][1]])
-            get_4body_envs!(peps,env_top, env_down, sample, row, h_envs)
+            get_4body_envs!(peps,env_top, env_down, sample, row, h_envs_4b)
         end
         
-        Ek_i, f = get_4body_term(peps, env_top, env_down, sample, key, h_envs)
-        Ek += Ek_i * exp(f - logψ)*terms[key]     # abs??   
+        Ek_i, f = get_4body_term(peps, env_top, env_down, sample, key, h_envs_4b)
+        Ek += Ek_i * exp(f - logψ)*terms[key]
     end
+    
     if abs(imag(Ek)) < 1e-10
         Ek = real(Ek)
     end
+
     return Ek
 end

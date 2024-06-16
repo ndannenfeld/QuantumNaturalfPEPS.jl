@@ -43,30 +43,30 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, Env_top=Array{Environ
     out = Array{ComplexF64}(undef, 2)
     
     if overwrite
-        Env_top[1] = generate_env_row(peps[1, :], S[1,:], 1, peps.contract_dim)
+        Env_top[1] = generate_env_row(peps, S[1,:], 1, peps.contract_dim)
     end
-    Env_down[1] = generate_env_row(peps[size(S,1), :], S[size(S,1),:], size(S,1), peps.contract_dim)
+    Env_down[1] = generate_env_row(peps, S[size(S,1),:], size(S,1), peps.contract_dim)
     
     # for every row we calculate the environments once from the top down and once from the bottom up
     for i in 2:size(S,1)-1
         i_prime = size(S,1)+1-i 
         
         if overwrite
-            Env_top[i] = generate_env_row(peps[i, :], S[i,:], i, peps.contract_dim, env_row_above = Env_top[i-1])
+            Env_top[i] = generate_env_row(peps, S[i,:], i, peps.contract_dim, env_row_above = Env_top[i-1])
         end
-        Env_down[i] = generate_env_row(peps[i_prime, :], S[i_prime,:], i_prime, peps.contract_dim, env_row_above = Env_down[i-1])
+        Env_down[i] = generate_env_row(peps, S[i_prime,:], i_prime, peps.contract_dim, env_row_above = Env_down[i-1])
     end
     
     # once we calculated all environments we calculate <ψ|S> using the environments
-    out[1] = contract(Env_top[end].env.*MPS([peps[size(S,1),j]*ITensor([(S[end,j]+1)%2, S[end,j]], inds(peps[size(S,1),j],"phys_$(j)_$(size(S,1))")) for j in 1:size(S,2)]))[1] * exp(Env_top[end].f)
-    out[2] = contract((MPS([peps[1,j]*ITensor([(S[1,j]+1)%2, S[1,j]], inds(peps[1,j],"phys_$(j)_$(1)")) for j in 1:size(S,2)])).*Env_down[end].env)[1] * exp(Env_down[end].f)
+    out[1] = contract(Env_top[end].env.*MPS([peps[size(S,1),j]*ITensor([(S[end,j]+1)%2, S[end,j]], siteind(peps, size(S,1), j)) for j in 1:size(S,2)]))[1] * exp(Env_top[end].f)
+    out[2] = contract((MPS([peps[1,j]*ITensor([(S[1,j]+1)%2, S[1,j]], siteind(peps, 1, j)) for j in 1:size(S,2)])).*Env_down[end].env)[1] * exp(Env_down[end].f)
     
     return mean(log.(Complex.((out)))), Env_top, Env_down
 end
 
 # calculates the environments for a given row and contracts that with env_row_above
-function generate_env_row(peps_row, S_row, i, contract_dim; env_row_above=nothing)
-    env = [peps_row[j]*ITensor([(S_row[j]+1)%2, S_row[j]], inds(peps_row[j],"phys_$(j)_$(i)")) for j in 1:length(S_row)]
+function generate_env_row(peps, S_row, i, contract_dim; env_row_above=nothing)
+    env = [peps[i,j]*ITensor([(S_row[j]+1)%2, S_row[j]], siteind(peps, i, j)) for j in 1:length(S_row)]
     norm_shift = 0
     if env_row_above === nothing
         env = MPS(env)
