@@ -77,7 +77,7 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
             g = exp(f - logψ)
             g = convert_if_real(g)
             Ok_Tensor *= g
-
+            @assert eltype(Ok_Tensor) === eltype(peps) "The gradient is $(eltype(Ok_Tensor)) but the PEPS is $(eltype(peps))"
 
             # lastly we reshape the tensor to a vector to obtain the gradient
             # TODO: Does this still work for phys_dim!=2? Possible bug waiting to happen, use the permute_and_copy! function I added to tensor_ops.jl
