@@ -215,9 +215,7 @@ function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environme
         Ek += Ek_i * exp(f - logψ)*terms[key]
     end
     
-    if abs(imag(Ek)) < 1e-10
-        Ek = real(Ek)
-    end
+    Ek = convert_if_real(Ek)
 
     return Ek
 end

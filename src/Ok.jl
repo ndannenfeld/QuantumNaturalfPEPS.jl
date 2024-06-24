@@ -14,21 +14,16 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
             if i == 1
                 # we get the differential tensor if we contract the environments with the peps_S
                 f = exp(env_down[end].f - logψ)
-                if abs(imag(f)) < 1e-10
-                    f = real(f)
-                end
+                f = convert_if_real(f)
+
                 Ok_Tensor = contract(env_down[end].env .* peps_S)
             elseif i == size(peps, 1)
                 f = exp(env_down[end].f - logψ)
-                if abs(imag(f)) < 1e-10
-                    f = real(f)
-                end
+                f = convert_if_real(f)
                 Ok_Tensor = f*contract(env_top[end].env .* peps_S)
             else
                 f = exp(env_top[i-1].f + env_down[end-i+1].f - logψ)
-                if abs(imag(f)) < 1e-10
-                    f = real(f)
-                end
+                f = convert_if_real(f)
                 Ok_Tensor = f * contract(env_top[i-1].env .* peps_S .* env_down[end-i+1].env)
             end
 
@@ -80,9 +75,7 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
                 Ok_Tensor *= h_envs[i,2,j-1]
             end
             g = exp(f - logψ)
-            if abs(imag(g)) < 1e-10
-                g = real(g)
-            end
+            g = convert_if_real(g)
             Ok_Tensor *= g
 
 
