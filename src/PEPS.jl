@@ -1,12 +1,11 @@
 mutable struct PEPS
     tensors::Matrix{ITensor}
     double_layer_envs
-    norm::Float64
     bond_dim::Integer
     sample_dim::Integer
     contract_dim::Integer
     double_contract_dim::Integer
-    PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; norm=0, sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim) = new(tensors, nothing, norm, bond_dim, sample_dim, contract_dim, double_contract_dim)
+    PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim) = new(tensors, nothing, bond_dim, sample_dim, contract_dim, double_contract_dim)
 end
 
 Base.size(peps::PEPS, args...) = size(peps.tensors, args...)
@@ -119,7 +118,6 @@ function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwarg
 end
 
 function ITensors.siteind(peps::PEPS, i, j)
-    # TODO: Get the indices from the PEPS instead of generating new ones (see ITensors/src/ITensorMPS/abstractmps.jl:620
     N = size(peps)
      if N == [1,1] 
         return firstind(M[1])

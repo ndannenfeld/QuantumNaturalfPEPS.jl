@@ -64,18 +64,7 @@ end
 
 # calculates the field double_layer_envs and the norm of peps
 function update_double_layer_envs!(peps::PEPS)
-    peps.double_layer_envs = generate_double_layer_envs(peps)
-
-    # TODO do we need to calculate the norm of the peps here?
-    # We also calculate the (log-)norm of the peps as it is used in get_sample to calculate p_c
-    E_mpo = generate_double_layer_env_row(peps[1, :], peps[2, :], peps.double_contract_dim)
-    E_mpo.env = E_mpo.env .*delta.(reduce(vcat, collect.(inds.(E_mpo.env, "-1"))), reduce(vcat, collect.(inds.(peps.double_layer_envs[1].env, "-1"))))
-    
-    for i in 1:length(E_mpo.env)
-        E_mpo.env[i] = (E_mpo.env[i]*peps.double_layer_envs[1].env[i])
-    end
-
-    peps.norm = real(log(Complex(contract(E_mpo.env)[1])))+(peps.double_layer_envs[1].f + E_mpo.f)    
+    peps.double_layer_envs = generate_double_layer_envs(peps) 
 end
 
 function generate_double_layer_envs(peps::PEPS)
@@ -109,16 +98,17 @@ end
 function calculate_E!(bra, ket, peps, row, E, indices_outer)
     if row != size(peps, 1)
         C = combiner(indices_outer[end], commoninds(peps[row,size(peps, 2)], peps[row+1,size(peps, 2)]), tags = "1")
-        E[end] = contract(bra[end]*ket[end]*C*delta(inds(peps.double_layer_envs[row].env[end], "-1")[1], inds(C)[1])*peps.double_layer_envs[row].env[end])
+
+        E[end] = peps.double_layer_envs[row].env[end]*delta(inds(peps.double_layer_envs[row].env[end], "-1")[1], inds(C)[1])*C*bra[end]*ket[end]
 
         for i in size(peps, 2)-1:-1:2
             C = combiner(indices_outer[i], commoninds(peps[row,i], peps[row+1,i]), tags = "1")
-            E[i-1] = contract(E[i]*bra[i]*ket[i]*C*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*peps.double_layer_envs[row].env[i])
+            E[i-1] = E[i]*peps.double_layer_envs[row].env[i]*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*C*ket[i]*bra[i]
         end
     else
-        E[end] = contract(bra[end]*ket[end])
+        E[end] = bra[end]*ket[end]
         for i in size(peps, 2)-1:-1:2
-            E[i-1] = contract(E[i]*bra[i]*ket[i])
+            E[i-1] = E[i]*bra[i]*ket[i]
         end
     end
 end
@@ -137,12 +127,12 @@ function get_PS(bra, ket, peps, row, i, E, indices_outer, sigma)
 
     
     if i == 1
-        P_S = contract(E[i]*sigma_1)
+        P_S = E[i]*sigma_1
     elseif i == size(peps, 2)
-        P_S = contract(sigma*sigma_1)
+        P_S = sigma*sigma_1
     else
-        P_S = contract(sigma*E[i])
-        P_S = contract(P_S*sigma_1)
+        P_S = sigma*E[i]
+        P_S = P_S*sigma_1
     end 
     
     return P_S, sigma_1
@@ -215,10 +205,8 @@ function get_sample(peps::PEPS)
             else
                 env_top[row] = Environment(bra./norm_bra, length(bra)*log(norm_bra)+env_top[row-1].f)
             end
-        else
-            psi_S = 2*real(log(Complex(contract(bra)[1])) + env_top[row-1].f)
         end
     end
     
-    return S, pc,psi_S ,env_top
+    return S, pc, env_top
 end

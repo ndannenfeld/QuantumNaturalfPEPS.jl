@@ -2,7 +2,7 @@
 # to get the true environtment: contract with the MPS and afterwards multiply by exp(f)
 mutable struct Environment
     env::MPS
-    f::ComplexF64 # TODO: Why is this complex?
+    f::Float64
     function Environment(env, f; normalize=true)
         env = new(env, f)
         if normalize

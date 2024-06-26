@@ -36,20 +36,18 @@ end
 # The central function is Oks and Eks
 function Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum, sample_nr::Integer; timer=TimerOutput(), kwargs...)
     # TODO: Use proper types
-    Ok = Matrix{ComplexF64}(undef, sample_nr, length(peps))
-    E_loc = Vector{ComplexF64}(undef, sample_nr)
+    Ok = Matrix{eltype(peps)}(undef, sample_nr, length(peps))
+    E_loc = Vector{Float64}(undef, sample_nr)
     logψ = Vector{ComplexF64}(undef, sample_nr)
     S = Vector{Matrix{Int}}(undef, sample_nr)
     pc = zeros(sample_nr) # TODO: Why initalized with zeros?
-    psi_S = zeros(sample_nr)
     # TODO: Pass a view of Ok to Ok_and_Ek to avoid copying
     for i in 1:sample_nr
-        Ok[i,:], E_loc[i], logψ[i], S[i], pc[i], psi_S[i] = Ok_and_Ek(peps, ham_op; timer, kwargs...)
+        Ok[i,:], E_loc[i], logψ[i], S[i], pc[i] = Ok_and_Ek(peps, ham_op; timer, kwargs...)
     end
     
-    # TODO: remove psi_S and compute logZ properly
-    Z = 1/sample_nr * sum(exp.(psi_S - pc))
-    p = (exp.(psi_S) ./Z) ./ exp.(pc) # determine the estimate for pc given the samples drawn
+    Z = 1/sample_nr * sum(exp.(logψ - pc))
+    p = (exp.(logψ) ./Z) ./ exp.(pc) # determine the estimate for pc given the samples drawn
     
     return Ok, E_loc, logψ, S, p
     # returns Gradient, local Energy, log(<ψ|S>), samples S, p

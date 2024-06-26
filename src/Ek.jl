@@ -109,33 +109,33 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
     y = [key[1][1][2], key[2][1][2]]
     
     for i in 1:2
-        con = contract(con*peps[x[i],y[i]]*ITensor([S[x[i],y[i]], (S[x[i],y[i]]+1)%2], siteind(peps,x[i],y[i])))
+        con = peps[x[i],y[i]]*ITensor([S[x[i],y[i]], (S[x[i],y[i]]+1)%2], siteind(peps,x[i],y[i]))*con
         if y[1] != y[2]
-            con = contract(con*peps[x[i],y[(i%2)+1]]*ITensor([(S[x[i],y[(i%2)+1]]+1)%2, S[x[i],y[(i%2)+1]]], siteind(peps,x[i],y[(i%2)+1])))
+            con = peps[x[i],y[(i%2)+1]]*ITensor([(S[x[i],y[(i%2)+1]]+1)%2, S[x[i],y[(i%2)+1]]], siteind(peps,x[i],y[(i%2)+1]))*con
         end
     end
         
     if minimum(x) != 1
-        con = contract(con*env_top[minimum(x)-1].env[minimum(y)])
+        con = con*env_top[minimum(x)-1].env[minimum(y)]
         if y[1] != y[2]
-            con = contract(con*env_top[minimum(x)-1].env[maximum(y)])
+            con = con*env_top[minimum(x)-1].env[maximum(y)]
         end
         f += env_top[minimum(x)-1].f
     end
         
     if maximum(x) != size(peps, 1)
-        con = contract(con*env_down[end-maximum(x)+1].env[minimum(y)])
+        con = con*env_down[end-maximum(x)+1].env[minimum(y)]
         if y[1] != y[2]
-            con = contract(con*env_down[end-maximum(x)+1].env[maximum(y)])
+            con = con*env_down[end-maximum(x)+1].env[maximum(y)]
         end
         f += env_down[end-maximum(x)+1].f
     end
            
     if minimum(y) != 1
-        con = contract(con*contract(h_envs[2,minimum(y)-1]))
+        con = con*h_envs[2,minimum(y)-1]
     end
     if maximum(y) != size(peps, 2)
-        con = contract(con*contract(h_envs[1,maximum(y)]))
+        con = con*h_envs[1,maximum(y)]
     end
         
     return con[1], f
@@ -170,10 +170,10 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
     end
         
     if minimum(y) != 1
-        flip = flip*contract(h_envs[2,minimum(y)-1])
+        flip = flip*h_envs[2,minimum(y)-1]
     end
     if maximum(y) != size(peps, 2)
-        flip = flip*contract(h_envs[1,maximum(y)])
+        flip = flip*h_envs[1,maximum(y)]
     end
        
     return contract(flip)[1], f
