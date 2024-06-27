@@ -12,7 +12,7 @@ Base.size(peps::PEPS, args...) = size(peps.tensors, args...)
 Base.getindex(peps::PEPS, args...) = getindex(peps.tensors, args...)
 Base.setindex!(peps::PEPS, v, i::Int, j::Int) = (peps.tensors[i, j] = v)
 Base.show(io::IO, peps::PEPS) = print(io, "PEPS(L=$(size(peps)), bond_dim=$(peps.bond_dim), sample_dim=$(peps.sample_dim), contract_dim=$(peps.contract_dim), double_contract_dim=$(peps.double_contract_dim))")
-Base.eltype(peps::PEPS) = eltype(peps.tensors[1,1]) # TODO: Make sure that the code works for both complex and real numbers
+Base.eltype(peps::PEPS) = eltype(peps.tensors[1, 1]) # TODO: Make sure that the code works for both complex and real numbers
 
 function Base.getproperty(x::PEPS, y::Symbol)
     if y === :double_layer_envs
@@ -77,47 +77,45 @@ end
 
 PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
 
-PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim, kwargs...)
-
 function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) where {S<:Number}
     Lx, Ly = size(hilbert)
-    tensors = Array{ITensor}(undef, Lx, Ly)
 
     # initializing bond indices
     indices = Array{Index{Int64}}(undef, (2*Lx*Ly - Lx - Ly))
     for i in 1:(2*Lx*Ly - Lx - Ly)
         indices[i] = Index(bond_dim, "Link,l=$(i)")
     end
+
+
     
     # filling the matrix of tensors with random ITensors wich share the same indices with their neighbours
+    tensors = Array{ITensor}(undef, Lx, Ly)
     for i in 1:Ly
         for j in 1:Lx
             phys_ind = hilbert[j, i]
             if i == 1
                 if j == 1
-                    peps_tensor = randomITensor(S, indices[1], indices[Ly*(Lx-1)+1], phys_ind)
+                    tensors[j, i] = randomITensor(S, indices[1], indices[Ly*(Lx-1)+1], phys_ind)
                 elseif j == Lx
-                    peps_tensor = randomITensor(S, indices[Lx-1], indices[Ly*(Lx-1)+Lx], phys_ind)
+                    tensors[j, i] = randomITensor(S, indices[Lx-1], indices[Ly*(Lx-1)+Lx], phys_ind)
                 else
-                    peps_tensor = randomITensor(S, indices[j-1],indices[j],indices[Ly*(Lx-1)+j], phys_ind)
+                    tensors[j, i] = randomITensor(S, indices[j-1],indices[j],indices[Ly*(Lx-1)+j], phys_ind)
                 end
             elseif i == Ly
                 if j == 1
-                    peps_tensor = randomITensor(S, indices[Ly*(Lx-1)+(Ly-2)*Lx+1], indices[(Ly-1)*(Lx-1)+1], phys_ind)
+                    tensors[j, i] = randomITensor(S, indices[Ly*(Lx-1)+(Ly-2)*Lx+1], indices[(Ly-1)*(Lx-1)+1], phys_ind)
                 elseif j == Lx
-                    peps_tensor = randomITensor(S, indices[Ly*(Lx-1)+(Ly-1)*Lx], indices[Ly*(Lx-1)], phys_ind)
+                    tensors[j, i] = randomITensor(S, indices[Ly*(Lx-1)+(Ly-1)*Lx], indices[Ly*(Lx-1)], phys_ind)
                 else
-                    peps_tensor = randomITensor(S, indices[Ly*(Lx-1)+(Ly-2)*Lx+j], indices[(Ly-1)*(Lx-1)+j-1], indices[(Ly-1)*(Lx-1)+j], phys_ind)
+                    tensors[j, i] = randomITensor(S, indices[Ly*(Lx-1)+(Ly-2)*Lx+j], indices[(Ly-1)*(Lx-1)+j-1], indices[(Ly-1)*(Lx-1)+j], phys_ind)
                 end
             elseif j == 1
-                peps_tensor = randomITensor(S, indices[Ly*(Lx-1)+(i-2)*Lx+1], indices[Ly*(Lx-1)+(i-1)*Lx+1], indices[(i-1)*(Lx-1)+1], phys_ind)
+                tensors[j, i] = randomITensor(S, indices[Ly*(Lx-1)+(i-2)*Lx+1], indices[Ly*(Lx-1)+(i-1)*Lx+1], indices[(i-1)*(Lx-1)+1], phys_ind)
             elseif j == Lx
-                peps_tensor = randomITensor(S, indices[Ly*(Lx-1)+(i-1)*Lx], indices[Ly*(Lx-1)+(i)*Lx], indices[i*(Lx-1)], phys_ind)
+                tensors[j, i] = randomITensor(S, indices[Ly*(Lx-1)+(i-1)*Lx], indices[Ly*(Lx-1)+(i)*Lx], indices[i*(Lx-1)], phys_ind)
             else
-                peps_tensor = randomITensor(S, indices[(i-1)*(Lx-1)+j-1], indices[(i-1)*(Lx-1)+j], indices[Ly*(Lx-1)+(i-2)*Lx+j], indices[Ly*(Lx-1)+(i-1)*Lx+j], phys_ind)
+                tensors[j, i] = randomITensor(S, indices[(i-1)*(Lx-1)+j-1], indices[(i-1)*(Lx-1)+j], indices[Ly*(Lx-1)+(i-2)*Lx+j], indices[Ly*(Lx-1)+(i-1)*Lx+j], phys_ind)
             end
-            
-            tensors[j, i] = peps_tensor
         end
     end
     
@@ -125,29 +123,23 @@ function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwarg
 end
 
 function ITensors.siteind(peps::PEPS, i, j)
-    N = size(peps)
-     if N == [1,1] 
+    Lx, Ly = size(peps)
+    if Lx == 1 && Ly == 1
         return firstind(M[1])
-     end
-     if N[1] == 1
-        return uniqueind(peps[i,j], peps[i,j%size(peps)[2] + 1], peps[i, (j-2+size(peps)[1])%size(peps)[2]+1])
-     end
-     if N[2] == 1 
-        return uniqueind(peps[i,j], peps[i%size(peps)[1]+1, j], peps[(i-2+size(peps)[1])%size(peps)[1]+1, j])
-     end
-        si = uniqueind(peps[i,j], peps[i%size(peps)[1]+1, j], peps[(i-2+size(peps)[1])%size(peps)[1]+1, j], peps[i,j%size(peps)[2] + 1], peps[i, (j-2+size(peps)[1])%size(peps)[2]+1])
-     return si
+    elseif Lx == 1
+        return uniqueind(peps[i,j], peps[i,j%Ly + 1], peps[i, (j-2+Lx)%Ly+1])
+    elseif Ly == 1
+        return uniqueind(peps[i,j], peps[i%Lx+1, j], peps[(i-2+Lx)%Lx+1, j])
+    end
+    si = uniqueind(peps[i,j], peps[i%Lx+1, j], peps[(i-2+Lx)%Lx+1, j], peps[i,j%Ly + 1], peps[i, (j-2+Lx)%Ly+1])
+    return si
 end
 
 function linkinds(peps::PEPS, i,j)
     return filter!(!=(siteind(peps,i,j)), collect(inds(peps[i,j])))
 end
 
-function ITensors.siteinds(peps::PEPS)
-    hilbert = [siteind(peps, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
-    return hilbert
-end
-
+ITensors.siteinds(peps::PEPS) = [siteind(peps, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
 
 # returns the exact inner product of 2 peps (only used for testing purposes)
 function inner_peps(psi::PEPS, psi2::PEPS)
