@@ -12,7 +12,7 @@ Base.size(peps::PEPS, args...) = size(peps.tensors, args...)
 Base.getindex(peps::PEPS, args...) = getindex(peps.tensors, args...)
 Base.setindex!(peps::PEPS, v, i::Int, j::Int) = (peps.tensors[i, j] = v)
 Base.show(io::IO, peps::PEPS) = print(io, "PEPS(L=$(size(peps)), bond_dim=$(peps.bond_dim), sample_dim=$(peps.sample_dim), contract_dim=$(peps.contract_dim), double_contract_dim=$(peps.double_contract_dim))")
-Base.eltype(peps::PEPS) = eltype(peps.tensors[1, 1]) # TODO: Make sure that the code works for both complex and real numbers
+Base.eltype(peps::PEPS) = eltype(peps.tensors[1, 1])
 
 function Base.getproperty(x::PEPS, y::Symbol)
     if y === :double_layer_envs
@@ -47,7 +47,7 @@ end
 function Base.length(peps::PEPS)
     x = 0
     for ten in peps.tensors
-        x += prod(dim.(inds(ten)))
+        x += prod(size(ten))
     end
     return x
 end
@@ -125,7 +125,7 @@ end
 function ITensors.siteind(peps::PEPS, i, j)
     Lx, Ly = size(peps)
     if Lx == 1 && Ly == 1
-        return firstind(M[1])
+        return firstind(peps[1, 1])
     elseif Lx == 1
         return uniqueind(peps[i,j], peps[i,j%Ly + 1], peps[i, (j-2+Lx)%Ly+1])
     elseif Ly == 1

@@ -14,7 +14,7 @@ function permute_and_copy!(dest, tensor::NDTensors.DenseTensor, target_indices)
     return permutedims!(dest, s, perm)
 end
 
-max_norm(x::ITensor) = maximum(abs.(x.tensor)) # TODO: Replace with version that does not use abs
+max_norm(x::ITensor) = maximum(abs, x.tensor)
 
 permute_reshape_and_copy!(dest, tensor::ITensor, target_indices) = permute_reshape_and_copy!(dest, tensor.tensor, target_indices)
 

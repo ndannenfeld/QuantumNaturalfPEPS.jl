@@ -35,14 +35,17 @@ end
 
 # The central function is Oks and Eks
 function Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum, sample_nr::Integer; timer=TimerOutput(), kwargs...)
-    Ok = Matrix{eltype(peps)}(undef, sample_nr, length(peps))
-    E_loc = Vector{Float64}(undef, sample_nr)
-    logψ = Vector{ComplexF64}(undef, sample_nr)
+    eltype_ = eltype(peps)
+    eltype_real = real(eltype_)
+    
+    Ok = Matrix{eltype_}(undef, sample_nr, length(peps))
+    E_loc = Vector{eltype_}(undef, sample_nr)
+    logψ = Vector{Complex{eltype_real}}(undef, sample_nr)
     S = Vector{Matrix{Int}}(undef, sample_nr)
-    pc = Vector{Float64}(undef, sample_nr)
+    pc = Vector{eltype_real}(undef, sample_nr)
 
     for i in 1:sample_nr
-        Ok_view = @view Ok[i,:]
+        Ok_view = @view Ok[i, :]
         _, E_loc[i], logψ[i], S[i], pc[i] = Ok_and_Ek(peps, ham_op; timer, Ok=Ok_view, kwargs...)
         #Ok[i,:], E_loc[i], logψ[i], S[i], pc[i] = Ok_and_Ek(peps, ham_op; timer, kwargs...)
     end
