@@ -59,7 +59,7 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, Env_top=Array{Environ
     
     # once we calculated all environments we calculate <ψ|S> using the environments
     out[1] = contract(Env_top[end].env.*MPS([peps[size(S,1),j]*ITensor([(S[end,j]+1)%2, S[end,j]], siteind(peps, size(S,1), j)) for j in 1:size(S,2)]))[1] * exp(Env_top[end].f)
-    out[2] = contract((MPS([peps[1,j]*ITensor([(S[1,j]+1)%2, S[1,j]], siteind(peps, 1, j)) for j in 1:size(S,2)])).*Env_down[end].env)[1] * exp(Env_down[end].f)
+    out[2] = contract((MPS([peps[1,j]*ITensor([(S[1,j]+1)%2, S[1,j]], siteind(peps, 1, j)) for j in 1:size(S,2)])).*Env_down[end].env)[1] * exp(Env_down[end].f) # TODO: We kept Env_down[end].f specifically in log scale?
     
     return mean(log.(Complex.((out)))), Env_top, Env_down
 end
