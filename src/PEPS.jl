@@ -32,18 +32,25 @@ end
 Base.convert(::Type{Vector}, peps::PEPS) = flatten(peps)
 function flatten(peps::PEPS) # Flattens the tensors into a vector
     type = eltype(peps)
-    θ = type[]
-    # TODO: Slow, first calculate the length and then fill the vector
+    θ = Vector{type}(undef, length(peps))
+    pos = 1
     for i in 1:size(peps, 1)
         for j in 1:size(peps, 2)
-            append!(θ, reshape(Array(peps[i,j], inds(peps[i,j])), :))
+            shift = prod(dim.(inds(peps[i,j])))
+            θ[pos:pos+shift-1] = reshape(Array(peps[i,j], inds(peps[i,j])), :)
+            pos = pos+shift
         end
     end
     return θ
 end
 
-
-Base.length(peps::PEPS) = length(flatten(peps)) # length(θ) # TODO: Write a more efficient version
+function Base.length(peps::PEPS)
+    x = 0
+    for ten in peps.tensors
+        x += prod(dim.(inds(ten)))
+    end
+    return x
+end
 
 function write!(peps::PEPS, θ::Vector{T}) where T# Writes the vector θ into the tensors.
     @assert eltype(peps) == T "The type of the PEPS and the vector θ must be the same type $T != $(eltype(peps))"
@@ -137,9 +144,7 @@ function linkinds(peps::PEPS, i,j)
 end
 
 function ITensors.siteinds(peps::PEPS)
-    # TODO: Replace with the following line
     hilbert = [siteind(peps, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
-    #hilbert = siteinds("S=1/2", size(peps, 1), size(peps, 2))
     return hilbert
 end
 

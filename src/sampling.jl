@@ -95,7 +95,7 @@ function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
 end
 
 # calculates the unsampled contractions along a row (from right to left the sites are contracted along the physical Index)
-function calculate_E!(bra, ket, peps, row, E, indices_outer)
+function calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
     if row != size(peps, 1)
         C = combiner(indices_outer[end], commoninds(peps[row,size(peps, 2)], peps[row+1,size(peps, 2)]), tags = "1")
 
@@ -114,7 +114,7 @@ function calculate_E!(bra, ket, peps, row, E, indices_outer)
 end
 
 # returns the 2x2 matrix P_S which is needed to sample from. Also updates sigma (used to store the contraction of already sampled sites from the left edge to the current site)
-function get_PS(bra, ket, peps, row, i, E, indices_outer, sigma)
+function get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
    # ket[i] = delta(inds(ket[i], "phys_$(i)_$(row)"), Index(2, "ket_phys"))*ket[i]
     ket[i] = delta(siteind(peps,row,i), Index(2, "ket_phys"))*ket[i]
    
@@ -180,13 +180,13 @@ function get_sample(peps::PEPS)
         bra, ket = get_bra_ket!(peps, row, indices_outer, env_top)
         
         # we then calculate the unsampled environment (in one row)
-        calculate_E!(bra, ket, peps, row, E, indices_outer) # TODO: Better name for calculate_E
+        calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
 
         # then we loop through the different sites in one row
         for i in 1:size(peps, 2)
             
             # calculate the 2x2 matrix from which we sample
-            P_S, sigma_1 = get_PS(bra, ket, peps, row, i, E, indices_outer, sigma) # TODO: Maybe rename function to get_reduced_ρ?
+            P_S, sigma_1 = get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
             
             # sample from P_S
             norm_factor, S[row,i], pc = sample_PS!(P_S, pc)

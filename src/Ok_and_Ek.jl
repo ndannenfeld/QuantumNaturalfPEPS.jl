@@ -3,7 +3,6 @@
 function Ok_and_Ek(peps, ham_op; timer=TimerOutput(), Ok=nothing, kwargs...)
      
     S, pc, env_top = @timeit timer "sampling" get_sample(peps) # draw a sample
-    # TODO: Give env_top as argument to get_logψ_and_envs if it samlping_dim == contract_dim
     logψ, env_top, env_down = @timeit timer "vertical_envs" get_logψ_and_envs(peps, S, env_top) # compute the environments of the peps according to that sample
     # TODO: The code would be easier to read if we would have left and right horizontal enviroments instead of everything crammed into an array
     h_envs = @timeit timer "horizontal_envs" get_all_horizontal_envs(peps, env_top, env_down, S) 

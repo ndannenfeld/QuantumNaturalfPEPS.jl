@@ -39,7 +39,7 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
                 pos = pos+shift
                 # TODO Reduce copys by not using Array, make sure that the indices are in the same order as the corresponding peps tensor
                 
-                x= @view Ok[pos:pos+shift-1]
+                x = @view Ok[pos:pos+shift-1]
                 permute_reshape_and_copy!(x, Ok_Tensor, linkinds(peps,i,j))
             else
                 x = @view Ok[pos:pos+shift-1]
