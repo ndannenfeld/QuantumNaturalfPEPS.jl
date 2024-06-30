@@ -47,43 +47,6 @@ function insert(arr, x)
     push!(arr,x)
 end
 
-function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_horizontal_envs::Array{ITensor}=Array{ITensor}(undef, size(peps,1), 2, size(peps, 2)-1))
-    for i in 1:size(peps,1)
-        get_horizontal_envs!(peps, env_top, env_down, S, i, @view all_horizontal_envs[i,:,:])
-    end
-    return all_horizontal_envs
-end
-
-function get_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs=Matrix{ITensor}(undef, 2,size(peps, 2)-1))
-    get_horizontal_envs!(peps, env_top, env_down,S,i,horizontal_envs)
-    return horizontal_envs
-end
-
-# this function computes the horizontal environments for a given row
-function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs)
-    peps_i = peps[i,:].*[ITensor([(S[i,k]+1)%2, S[i,k]], siteind(peps,i,k)) for k in 1:size(peps, 2)]     #contract the row with S
-    
-    # now we loop through every site and compute the environments (once from the right and once from the left) by MPO-MPS contraction.
-    if i == 1
-        contract_recursiv!(horizontal_envs, peps_i, env_down[end].env)
-    elseif i == size(peps, 1)
-        contract_recursiv!(horizontal_envs, peps_i, env_top[end].env)
-    else
-        contract_recursiv!(horizontal_envs, env_top[i-1].env, peps_i; c=env_down[end-i+1].env)
-    end
-end
-
-function contract_recursiv!(h_envs, a, b; c=ones(length(a)), d=ones(length(a)))
-    h_envs[1,end] = a[end]*b[end]*c[end]
-    h_envs[2,1] = a[1]*b[1]*c[1]
-    for j in length(a)-1:-1:2
-        h_envs[1,j-1] = h_envs[1,j]*a[j]*b[j]*c[j]
-    end
-    for j in 2:length(a)-1
-        h_envs[2,j] = h_envs[2,j-1]*a[j]*b[j]*c[j]
-    end
-end
-
 # same as above but for non-horizontal components
 function get_4body_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs::Matrix{ITensor})
     peps_i = peps[i,:].*[ITensor([(S[i,k]+1)%2, S[i,k]], siteind(peps,i,k)) for k in 1:size(peps, 2)]

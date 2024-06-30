@@ -115,7 +115,6 @@ end
 
 # returns the 2x2 matrix P_S which is needed to sample from. Also updates sigma (used to store the contraction of already sampled sites from the left edge to the current site)
 function get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
-   # ket[i] = delta(inds(ket[i], "phys_$(i)_$(row)"), Index(2, "ket_phys"))*ket[i]
     ket[i] = delta(siteind(peps,row,i), Index(2, "ket_phys"))*ket[i]
    
     if row != size(peps, 1)

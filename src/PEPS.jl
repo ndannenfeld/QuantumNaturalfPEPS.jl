@@ -152,4 +152,27 @@ function inner_peps(psi::PEPS, psi2::PEPS)
     return x[1]
 end
 
+function get_projector(i, index; shift=1)
+    @assert index.space >= i+shift
+    t = ITensor(Int32, index)
+    t[i+shift] = 1
+    return t
+end
 
+function get_projected(peps, S, i, j)
+    index = siteind(peps, i, j)
+    return peps[i,j] * get_projector(S[i, j], index)
+end
+
+get_projected(peps, S) = [get_projected(peps, S, i, j)  for i in 1:size(peps, 1), j in 1:size(peps, 2)]
+
+function contract_peps_exact(peps)
+    x = 1
+    for i in 1:size(peps,1)
+        for j in 1:size(peps,2)
+            x *= peps[i,j]
+        end
+    end
+
+    return x[1]
+end

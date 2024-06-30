@@ -40,40 +40,84 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, Env_top=Array{Environ
     end
     
     Env_down = Array{Environment}(undef, size(S,1)-1)
-    out = Array{ComplexF64}(undef, 2)
+
+    peps_projected = get_projected(peps, S)
     
     if overwrite
-        Env_top[1] = generate_env_row(peps, S[1,:], 1, peps.contract_dim)
+        Env_top[1] = generate_env_row(peps_projected[1,:], peps.contract_dim)
     end
-    Env_down[1] = generate_env_row(peps, S[size(S,1),:], size(S,1), peps.contract_dim)
+    Env_down[1] = generate_env_row(peps_projected[size(S,1), :], peps.contract_dim)
     
     # for every row we calculate the environments once from the top down and once from the bottom up
     for i in 2:size(S,1)-1
         i_prime = size(S,1)+1-i 
-        
         if overwrite
-            Env_top[i] = generate_env_row(peps, S[i,:], i, peps.contract_dim, env_row_above = Env_top[i-1])
+            Env_top[i] = generate_env_row(peps_projected[i,:], peps.contract_dim, env_row_above = Env_top[i-1])
         end
-        Env_down[i] = generate_env_row(peps, S[i_prime,:], i_prime, peps.contract_dim, env_row_above = Env_down[i-1])
+        Env_down[i] = generate_env_row(peps_projected[i_prime,:], peps.contract_dim, env_row_above = Env_down[i-1])
     end
     
     # once we calculated all environments we calculate <ψ|S> using the environments
-    out[1] = contract(Env_top[end].env.*MPS([peps[size(S,1),j]*ITensor([(S[end,j]+1)%2, S[end,j]], siteind(peps, size(S,1), j)) for j in 1:size(S,2)]))[1] * exp(Env_top[end].f)
-    out[2] = contract((MPS([peps[1,j]*ITensor([(S[1,j]+1)%2, S[1,j]], siteind(peps, 1, j)) for j in 1:size(S,2)])).*Env_down[end].env)[1] * exp(Env_down[end].f) # TODO: We kept Env_down[end].f specifically in log scale?
-    
-    return mean(log.(Complex.((out)))), Env_top, Env_down
+    return get_logψ(Env_top, Env_down), Env_top, Env_down
 end
 
 # calculates the environments for a given row and contracts that with env_row_above
-function generate_env_row(peps, S_row, i, contract_dim; env_row_above=nothing)
-    env = [peps[i,j]*ITensor([(S_row[j]+1)%2, S_row[j]], siteind(peps, i, j)) for j in 1:length(S_row)]
+function generate_env_row(peps_projected, contract_dim; env_row_above=nothing)
     norm_shift = 0
     if env_row_above === nothing
-        env = MPS(env)
+        peps_projected = MPS(peps_projected)
     else
-        env = apply(MPO(env), env_row_above.env, maxdim=contract_dim)
+        peps_projected = contract(MPO(peps_projected), env_row_above.env, maxdim=contract_dim)#, method = "naive")
         norm_shift = env_row_above.f
     end
 
-    return Environment(env, norm_shift; normalize=true)
+    return Environment(peps_projected, norm_shift; normalize=true)
+end
+
+function get_logψ(env_top::Vector{Environment}, env_down::Vector{Environment}; cut=Int(ceil(length(env_top)/2)))
+    ψS = contract(env_top[cut].env.*env_down[end-cut+1].env)[1]
+    return (log(Complex(ψS)) + env_top[cut].f + env_down[end-cut+1].f)
+end
+
+function logψ_exact(peps, sample)
+    proj = get_projected(peps, sample)
+    con = contract_peps_exact(proj)
+    return log(Complex(con))
+end
+
+function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_horizontal_envs::Array{ITensor}=Array{ITensor}(undef, size(peps,1), 2, size(peps, 2)-1))
+    for i in 1:size(peps,1)
+        get_horizontal_envs!(peps, env_top, env_down, S, i, @view all_horizontal_envs[i,:,:])
+    end
+    return all_horizontal_envs
+end
+
+function get_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs=Matrix{ITensor}(undef, 2,size(peps, 2)-1))
+    get_horizontal_envs!(peps, env_top, env_down,S,i,horizontal_envs)
+    return horizontal_envs
+end
+
+# this function computes the horizontal environments for a given row
+function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs)
+    peps_i = get_projected(peps[i,:], S[i,:])    #contract the row with S
+    
+    # now we loop through every site and compute the environments (once from the right and once from the left) by MPO-MPS contraction.
+    if i == 1
+        contract_recursiv!(horizontal_envs, peps_i, env_down[end].env)
+    elseif i == size(peps, 1)
+        contract_recursiv!(horizontal_envs, peps_i, env_top[end].env)
+    else
+        contract_recursiv!(horizontal_envs, env_top[i-1].env, peps_i; c=env_down[end-i+1].env)
+    end
+end
+
+function contract_recursiv!(h_envs, a, b; c=ones(length(a)), d=ones(length(a)))
+    h_envs[1,end] = a[end]*b[end]*c[end]
+    h_envs[2,1] = a[1]*b[1]*c[1]
+    for j in length(a)-1:-1:2
+        h_envs[1,j-1] = h_envs[1,j]*a[j]*b[j]*c[j]
+    end
+    for j in 2:length(a)-1
+        h_envs[2,j] = h_envs[2,j-1]*a[j]*b[j]*c[j]
+    end
 end
