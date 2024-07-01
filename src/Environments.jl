@@ -75,7 +75,7 @@ function generate_env_row(peps_projected, contract_dim; env_row_above=nothing)
 end
 
 function get_logψ(env_top::Vector{Environment}, env_down::Vector{Environment}; cut=Int(ceil(length(env_top)/2)))
-    ψS = contract(env_top[cut].env.*env_down[end-cut+1].env)[1]
+    ψS = contract(env_top[cut].env.*env_down[end-cut+1].env)[1] # TODO: Don't you want to use inner here?
     return (log(Complex(ψS)) + env_top[cut].f + env_down[end-cut+1].f)
 end
 

@@ -25,3 +25,10 @@ function permute_reshape_and_copy!(dest, tensor::NDTensors.DenseTensor, target_i
     permutedims!(d, s, perm)
     dest .= reshape(d, :)
 end
+
+function random_unitary(::Type{ElT}, i1::Vector{Index{Int64}}, i2::Vector{Index{Int64}}) where ElT<:Number
+    t = NDTensors.random_unitary(Float64, dim(i1), dim(i2))
+    return ITensor(t, i1..., i2...)
+end
+
+random_unitary(i1::Vector{Index{Int64}}, i2::Vector{Index{Int64}}) = random_unitary(Float64, i1, i2)

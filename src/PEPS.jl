@@ -77,17 +77,11 @@ end
 
 PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
 
-function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) where {S<:Number}
+
+
+function PEPS_tensor_init(::Type{S}, hilbert, links) where {S<:Number}
     Lx, Ly = size(hilbert)
 
-    # initializing bond indices
-    indices = Array{Index{Int64}}(undef, (2*Lx*Ly - Lx - Ly))
-    for i in 1:(2*Lx*Ly - Lx - Ly)
-        indices[i] = Index(bond_dim, "Link,l=$(i)")
-    end
-
-
-    
     # filling the matrix of tensors with random ITensors wich share the same indices with their neighbours
     tensors = Array{ITensor}(undef, Lx, Ly)
     for i in 1:Ly
@@ -95,29 +89,48 @@ function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwarg
             phys_ind = hilbert[j, i]
             if i == 1
                 if j == 1
-                    tensors[j, i] = randomITensor(S, indices[1], indices[Ly*(Lx-1)+1], phys_ind)
+                    tensors[j, i] = randomITensor(S, links[1], links[Ly*(Lx-1)+1], phys_ind)
                 elseif j == Lx
-                    tensors[j, i] = randomITensor(S, indices[Lx-1], indices[Ly*(Lx-1)+Lx], phys_ind)
+                    tensors[j, i] = randomITensor(S, links[Lx-1], links[Ly*(Lx-1)+Lx], phys_ind)
                 else
-                    tensors[j, i] = randomITensor(S, indices[j-1],indices[j],indices[Ly*(Lx-1)+j], phys_ind)
+                    tensors[j, i] = randomITensor(S, links[j-1],links[j],links[Ly*(Lx-1)+j], phys_ind)
                 end
             elseif i == Ly
                 if j == 1
-                    tensors[j, i] = randomITensor(S, indices[Ly*(Lx-1)+(Ly-2)*Lx+1], indices[(Ly-1)*(Lx-1)+1], phys_ind)
+                    tensors[j, i] = randomITensor(S, links[Ly*(Lx-1)+(Ly-2)*Lx+1], links[(Ly-1)*(Lx-1)+1], phys_ind)
                 elseif j == Lx
-                    tensors[j, i] = randomITensor(S, indices[Ly*(Lx-1)+(Ly-1)*Lx], indices[Ly*(Lx-1)], phys_ind)
+                    tensors[j, i] = randomITensor(S, links[Ly*(Lx-1)+(Ly-1)*Lx], links[Ly*(Lx-1)], phys_ind)
                 else
-                    tensors[j, i] = randomITensor(S, indices[Ly*(Lx-1)+(Ly-2)*Lx+j], indices[(Ly-1)*(Lx-1)+j-1], indices[(Ly-1)*(Lx-1)+j], phys_ind)
+                    tensors[j, i] = randomITensor(S, links[Ly*(Lx-1)+(Ly-2)*Lx+j], links[(Ly-1)*(Lx-1)+j-1], links[(Ly-1)*(Lx-1)+j], phys_ind)
                 end
             elseif j == 1
-                tensors[j, i] = randomITensor(S, indices[Ly*(Lx-1)+(i-2)*Lx+1], indices[Ly*(Lx-1)+(i-1)*Lx+1], indices[(i-1)*(Lx-1)+1], phys_ind)
+                tensors[j, i] = randomITensor(S, links[Ly*(Lx-1)+(i-2)*Lx+1], links[Ly*(Lx-1)+(i-1)*Lx+1], links[(i-1)*(Lx-1)+1], phys_ind)
             elseif j == Lx
-                tensors[j, i] = randomITensor(S, indices[Ly*(Lx-1)+(i-1)*Lx], indices[Ly*(Lx-1)+(i)*Lx], indices[i*(Lx-1)], phys_ind)
+                tensors[j, i] = randomITensor(S, links[Ly*(Lx-1)+(i-1)*Lx], links[Ly*(Lx-1)+(i)*Lx], links[i*(Lx-1)], phys_ind)
             else
-                tensors[j, i] = randomITensor(S, indices[(i-1)*(Lx-1)+j-1], indices[(i-1)*(Lx-1)+j], indices[Ly*(Lx-1)+(i-2)*Lx+j], indices[Ly*(Lx-1)+(i-1)*Lx+j], phys_ind)
+                tensors[j, i] = randomITensor(S, links[(i-1)*(Lx-1)+j-1], links[(i-1)*(Lx-1)+j], links[Ly*(Lx-1)+(i-2)*Lx+j], links[Ly*(Lx-1)+(i-1)*Lx+j], phys_ind)
             end
         end
     end
+    return tensors
+end
+# TODO: Write an alternative initializer that initializes the peps as an isopeps
+#   |
+#   v /
+# ->[]->
+#   |
+#   v
+
+function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=PEPS_tensor_init, kwargs...) where {S<:Number}
+    Lx, Ly = size(hilbert)
+
+    # initializing bond indices
+    links = Array{Index{Int64}}(undef, (2*Lx*Ly - Lx - Ly))
+    for i in 1:(2*Lx*Ly - Lx - Ly)
+        # TODO: Improve the naming of the links to make them more readable
+        links[i] = Index(bond_dim, "Link,l=$(i)")
+    end
+    tensors = tensor_init(S, hilbert, links)
     
     return PEPS(tensors, bond_dim; kwargs...)
 end
@@ -153,10 +166,8 @@ function inner_peps(psi::PEPS, psi2::PEPS)
 end
 
 function get_projector(i, index; shift=1)
-    @assert index.space >= i+shift
-    t = ITensor(Int32, index)
-    t[i+shift] = 1
-    return t
+    @assert index.space >= i+shift "The index space is too small for the given shift"
+    return onehot(index=>i+shift)
 end
 
 function get_projected(peps, S, i, j)
