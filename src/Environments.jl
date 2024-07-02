@@ -32,33 +32,33 @@ function normalize!(env::Environment)
 end
 
 # Computes the environments and log(<ψ|S>)
-function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, Env_top=Array{Environment}(undef, size(S,1)-1))
+function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environment}(undef, size(S,1)-1); kwargs...)
     
-    overwrite = true    # if Env_top is given and the bond dimension is sufficient, we do not need to calculate it again
-    if isdefined(Env_top, 1) && maxlinkdim(Env_top[1].env) >= peps.contract_dim
+    overwrite = true    # if env_top is given and the bond dimension is sufficient, we do not need to calculate it again
+    if isdefined(env_top, 1) && maxlinkdim(env_top[1].env) >= peps.contract_dim
         overwrite = false
     end
     
-    Env_down = Array{Environment}(undef, size(S,1)-1)
+    env_down = Array{Environment}(undef, size(S,1)-1)
 
     peps_projected = get_projected(peps, S)
     
     if overwrite
-        Env_top[1] = generate_env_row(peps_projected[1,:], peps.contract_dim)
+        env_top[1] = generate_env_row(peps_projected[1,:], peps.contract_dim)
     end
-    Env_down[1] = generate_env_row(peps_projected[size(S,1), :], peps.contract_dim)
+    env_down[1] = generate_env_row(peps_projected[size(S,1), :], peps.contract_dim)
     
     # for every row we calculate the environments once from the top down and once from the bottom up
     for i in 2:size(S,1)-1
         i_prime = size(S,1)+1-i 
         if overwrite
-            Env_top[i] = generate_env_row(peps_projected[i,:], peps.contract_dim, env_row_above = Env_top[i-1])
+            env_top[i] = generate_env_row(peps_projected[i,:], peps.contract_dim, env_row_above=env_top[i-1])
         end
-        Env_down[i] = generate_env_row(peps_projected[i_prime,:], peps.contract_dim, env_row_above = Env_down[i-1])
+        env_down[i] = generate_env_row(peps_projected[i_prime,:], peps.contract_dim, env_row_above=env_down[i-1])
     end
     
     # once we calculated all environments we calculate <ψ|S> using the environments
-    return get_logψ(Env_top, Env_down), Env_top, Env_down
+    return get_logψ(env_top, env_down; kwargs...), env_top, env_down
 end
 
 # calculates the environments for a given row and contracts that with env_row_above
@@ -74,9 +74,9 @@ function generate_env_row(peps_projected, contract_dim; env_row_above=nothing)
     return Environment(peps_projected, norm_shift; normalize=true)
 end
 
-function get_logψ(env_top::Vector{Environment}, env_down::Vector{Environment}; cut=Int(ceil(length(env_top)/2)))
-    ψS = contract(env_top[cut].env.*env_down[end-cut+1].env)[1] # TODO: Don't you want to use inner here?
-    return (log(Complex(ψS)) + env_top[cut].f + env_down[end-cut+1].f)
+function get_logψ(env_top::Vector{Environment}, env_down::Vector{Environment}; pos=Int(ceil(length(env_top)/2)))
+    ψS = contract(env_top[pos].env.*env_down[end-pos+1].env)[1] # TODO: Don't you want to use inner here?
+    return (log(Complex(ψS)) + env_top[pos].f + env_down[end-pos+1].f)
 end
 
 function logψ_exact(peps, sample)
