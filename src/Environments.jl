@@ -32,7 +32,8 @@ function normalize!(env::Environment)
 end
 
 # Computes the environments and log(<ψ|S>)
-function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environment}(undef, size(S,1)-1); kwargs...)
+function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environment}(undef, size(S,1)-1);
+                           alg="densitymatrix", cutoff=1e-13, kwargs...)
     
     overwrite = true    # if env_top is given and the bond dimension is sufficient, we do not need to calculate it again
     if isdefined(env_top, 1) && maxlinkdim(env_top[1].env) >= peps.contract_dim
@@ -44,17 +45,17 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environ
     peps_projected = get_projected(peps, S)
     
     if overwrite
-        env_top[1] = generate_env_row(peps_projected[1,:], peps.contract_dim)
+        env_top[1] = generate_env_row(peps_projected[1,:], peps.contract_dim; alg, cutoff)
     end
-    env_down[1] = generate_env_row(peps_projected[size(S,1), :], peps.contract_dim)
+    env_down[1] = generate_env_row(peps_projected[size(S,1), :], peps.contract_dim; alg, cutoff)
     
     # for every row we calculate the environments once from the top down and once from the bottom up
     for i in 2:size(S,1)-1
         i_prime = size(S,1)+1-i 
         if overwrite
-            env_top[i] = generate_env_row(peps_projected[i,:], peps.contract_dim, env_row_above=env_top[i-1])
+            env_top[i] = generate_env_row(peps_projected[i,:], peps.contract_dim, env_row_above=env_top[i-1]; alg, cutoff)
         end
-        env_down[i] = generate_env_row(peps_projected[i_prime,:], peps.contract_dim, env_row_above=env_down[i-1])
+        env_down[i] = generate_env_row(peps_projected[i_prime,:], peps.contract_dim, env_row_above=env_down[i-1]; alg, cutoff)
     end
     
     # once we calculated all environments we calculate <ψ|S> using the environments
@@ -62,12 +63,12 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environ
 end
 
 # calculates the environments for a given row and contracts that with env_row_above
-function generate_env_row(peps_projected, contract_dim; env_row_above=nothing)
+function generate_env_row(peps_projected, contract_dim; env_row_above=nothing, alg="densitymatrix", cutoff=1e-13)
     norm_shift = 0
     if env_row_above === nothing
         peps_projected = MPS(peps_projected)
     else
-        peps_projected = contract(MPO(peps_projected), env_row_above.env, maxdim=contract_dim)#, method = "naive")
+        peps_projected = contract(MPO(peps_projected), env_row_above.env; maxdim=contract_dim, alg, cutoff)
         norm_shift = env_row_above.f
     end
 
