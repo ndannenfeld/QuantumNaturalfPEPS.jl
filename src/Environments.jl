@@ -100,7 +100,7 @@ end
 
 # this function computes the horizontal environments for a given row
 function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs)
-    peps_i = get_projected(peps[i,:], S[i,:])    #contract the row with S
+    peps_i = get_projected(peps, S)[i,:]    #contract the row with S
     
     # now we loop through every site and compute the environments (once from the right and once from the left) by MPO-MPS contraction.
     if i == 1
@@ -113,12 +113,37 @@ function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down
 end
 
 function contract_recursiv!(h_envs, a, b; c=ones(length(a)), d=ones(length(a)))
-    h_envs[1,end] = a[end]*b[end]*c[end]
-    h_envs[2,1] = a[1]*b[1]*c[1]
+    h_envs[1,end] = a[end]*b[end]*c[end]*d[end]
+    h_envs[2,1] = a[1]*b[1]*c[1]*d[1]
     for j in length(a)-1:-1:2
-        h_envs[1,j-1] = h_envs[1,j]*a[j]*b[j]*c[j]
+        h_envs[1,j-1] = h_envs[1,j]*a[j]*b[j]*c[j]*d[j]
     end
     for j in 2:length(a)-1
-        h_envs[2,j] = h_envs[2,j-1]*a[j]*b[j]*c[j]
+        h_envs[2,j] = h_envs[2,j-1]*a[j]*b[j]*c[j]*d[j]
+    end
+end
+
+function get_all_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_4b_envs::Array{ITensor}=Array{ITensor}(undef, size(peps,1), 2, size(peps, 2)-1))
+    for i in 1:size(peps,1)-1
+        get_4b_envs!(peps, env_top, env_down, S, i, @view all_4b_envs[i,:,:])
+    end
+    return all_4b_envs
+end
+
+function get_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs=Matrix{ITensor}(undef, 2,size(peps, 2)-1))
+    get_4b_envs!(peps, env_top, env_down,S,i,fourb_envs)
+    return fourb_envs
+end
+
+function get_4b_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs)
+    peps_i = get_projected(peps, S)[i,:] 
+    peps_j = get_projected(peps, S)[i+1,:]
+
+    if i == 1
+        contract_recursiv!(fourb_envs, peps_i, peps_j, c=env_down[end-1].env)
+    elseif i == size(peps, 1)-1
+        contract_recursiv!(fourb_envs, env_top[end-1].env, peps_i, c=peps_j)
+    else
+        contract_recursiv!(fourb_envs, env_top[i-1].env, peps_i, c=peps_j, d=env_down[end-i].env)
     end
 end

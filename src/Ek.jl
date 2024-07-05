@@ -112,6 +112,10 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
     y = [key[1][1][2]]
     
     flip = peps[x,y[1]]*ITensor([S[x,y[1]], (S[x,y[1]]+1)%2], siteind(peps,x,y[1]))
+    if minimum(y) != 1
+        flip = flip*h_envs[2,minimum(y)-1]
+    end
+    
     if x != size(peps, 1)
         flip = flip*env_down[end-x+1].env[y[1]]
         f += env_down[end-x+1].f
@@ -132,9 +136,6 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
         end
     end
         
-    if minimum(y) != 1
-        flip = flip*h_envs[2,minimum(y)-1]
-    end
     if maximum(y) != size(peps, 2)
         flip = flip*h_envs[1,maximum(y)]
     end
