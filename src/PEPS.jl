@@ -170,12 +170,20 @@ function get_projector(i, index; shift=1)
     return onehot(index=>i+shift)
 end
 
-function get_projected(peps, S, i, j)
+function get_projected(peps::PEPS, S, i, j)
+    if i === Colon() && j === Colon()
+        return [get_projected(peps, S, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
+    elseif i === Colon()
+        return [get_projected(peps, S, i, j) for i in 1:size(peps, 1)]
+    elseif j === Colon()
+        return [get_projected(peps, S, i, j) for j in 1:size(peps, 2)]
+    end
+
     index = siteind(peps, i, j)
     return peps[i,j] * get_projector(S[i, j], index)
 end
 
-get_projected(peps, S) = [get_projected(peps, S, i, j)  for i in 1:size(peps, 1), j in 1:size(peps, 2)]
+get_projected(peps::PEPS, S) = [get_projected(peps, S, i, j)  for i in 1:size(peps, 1), j in 1:size(peps, 2)]
 
 function contract_peps_exact(peps)
     x = 1

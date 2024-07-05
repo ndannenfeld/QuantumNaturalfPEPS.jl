@@ -100,7 +100,7 @@ end
 
 # this function computes the horizontal environments for a given row
 function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs)
-    peps_i = get_projected(peps[i,:], S[i,:])    #contract the row with S
+    peps_i = get_projected(peps, S, i, :)    #contract the row with S
     
     # now we loop through every site and compute the environments (once from the right and once from the left) by MPO-MPS contraction.
     if i == 1
