@@ -77,10 +77,15 @@ end
 
 PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
 
-
-
-function PEPS_tensor_init(::Type{S}, hilbert, links) where {S<:Number}
+function PEPS_tensor_init(::Type{S}, hilbert, bond_dim) where {S<:Number}
     Lx, Ly = size(hilbert)
+
+    # initializing bond indices
+    links = Array{Index{Int64}}(undef, (2*Lx*Ly - Lx - Ly))
+    for i in 1:(2*Lx*Ly - Lx - Ly)
+        # TODO: Improve the naming of the links to make them more readable
+        links[i] = Index(bond_dim, "Link,l=$(i)")
+    end
 
     # filling the matrix of tensors with random ITensors wich share the same indices with their neighbours
     tensors = Array{ITensor}(undef, Lx, Ly)
@@ -114,25 +119,71 @@ function PEPS_tensor_init(::Type{S}, hilbert, links) where {S<:Number}
     end
     return tensors
 end
+
+function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=isoPEPS_tensor_init, kwargs...) where {S<:Number}
+    
+    tensors = tensor_init(S, hilbert, bond_dim)
+    
+    return PEPS(tensors, bond_dim; kwargs...)
+end
+
 # TODO: Write an alternative initializer that initializes the peps as an isopeps
 #   |
 #   v /
 # ->[]->
 #   |
 #   v
+function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim) where {S<:Number}
+    Lx, Ly = size(hilbert)
 
-function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=PEPS_tensor_init, kwargs...) where {S<:Number}
+    h_links, v_links = init_Links(hilbert; bond_dim)
+
+    # filling the matrix of tensors with random unitary ITensors wich share the same indices with their neighbours
+    tensors = Array{ITensor}(undef, Lx, Ly)
+    outgoing_inds = Vector{Index{Int64}}()
+    ingoing_inds = Vector{Index{Int64}}()
+    for i in 1:Lx
+        for j in 1:Ly
+            push!(ingoing_inds, hilbert[i, j])
+
+            if j != Ly
+                push!(outgoing_inds, h_links[i,j])
+            end
+            if i != Lx
+                push!(outgoing_inds, v_links[i,j])
+            end
+            if j != 1
+                push!(ingoing_inds, h_links[i,j-1])
+            end
+            if i != 1
+                push!(ingoing_inds, v_links[i-1,j])
+            end
+
+            tensors[i,j] = random_unitary(S, ingoing_inds, outgoing_inds)
+            empty!(outgoing_inds)
+            empty!(ingoing_inds)
+        end
+    end
+    return tensors
+end
+
+function init_Links(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1)
     Lx, Ly = size(hilbert)
 
     # initializing bond indices
-    links = Array{Index{Int64}}(undef, (2*Lx*Ly - Lx - Ly))
-    for i in 1:(2*Lx*Ly - Lx - Ly)
-        # TODO: Improve the naming of the links to make them more readable
-        links[i] = Index(bond_dim, "Link,l=$(i)")
+    h_links = Array{Index{Int64}}(undef, Lx, Ly-1)
+    v_links = Array{Index{Int64}}(undef, Lx-1, Ly)
+    for i in 1:Lx
+        for j in 1:Ly-1
+            h_links[i,j] = Index(bond_dim, "h_link, $(i)$(j) -> $(i)$(j+1)")
+        end
     end
-    tensors = tensor_init(S, hilbert, links)
-    
-    return PEPS(tensors, bond_dim; kwargs...)
+    for i in 1:Lx-1
+        for j in 1:Ly
+            v_links[i,j] = Index(bond_dim, "v_link, $(i)$(j) -> $(i+1)$(j)")
+        end
+    end
+    return h_links, v_links
 end
 
 function ITensors.siteind(peps::PEPS, i, j)
@@ -183,7 +234,7 @@ function get_projected(peps::PEPS, S, i, j)
     return peps[i,j] * get_projector(S[i, j], index)
 end
 
-get_projected(peps::PEPS, S) = [get_projected(peps, S, i, j)  for i in 1:size(peps, 1), j in 1:size(peps, 2)]
+get_projected(peps::PEPS, S) = [get_projected(peps, S, i, j)  for i in 1:size(S, 1), j in 1:size(S, 2)]
 
 function contract_peps_exact(peps)
     x = 1
