@@ -77,49 +77,6 @@ end
 
 PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
 
-function PEPS_tensor_init(::Type{S}, hilbert, bond_dim) where {S<:Number}
-    Lx, Ly = size(hilbert)
-
-    # initializing bond indices
-    links = Array{Index{Int64}}(undef, (2*Lx*Ly - Lx - Ly))
-    for i in 1:(2*Lx*Ly - Lx - Ly)
-        # TODO: Improve the naming of the links to make them more readable
-        links[i] = Index(bond_dim, "Link,l=$(i)")
-    end
-
-    # filling the matrix of tensors with random ITensors wich share the same indices with their neighbours
-    tensors = Array{ITensor}(undef, Lx, Ly)
-    for i in 1:Ly
-        for j in 1:Lx
-            phys_ind = hilbert[j, i]
-            if i == 1
-                if j == 1
-                    tensors[j, i] = randomITensor(S, links[1], links[Ly*(Lx-1)+1], phys_ind)
-                elseif j == Lx
-                    tensors[j, i] = randomITensor(S, links[Lx-1], links[Ly*(Lx-1)+Lx], phys_ind)
-                else
-                    tensors[j, i] = randomITensor(S, links[j-1],links[j],links[Ly*(Lx-1)+j], phys_ind)
-                end
-            elseif i == Ly
-                if j == 1
-                    tensors[j, i] = randomITensor(S, links[Ly*(Lx-1)+(Ly-2)*Lx+1], links[(Ly-1)*(Lx-1)+1], phys_ind)
-                elseif j == Lx
-                    tensors[j, i] = randomITensor(S, links[Ly*(Lx-1)+(Ly-1)*Lx], links[Ly*(Lx-1)], phys_ind)
-                else
-                    tensors[j, i] = randomITensor(S, links[Ly*(Lx-1)+(Ly-2)*Lx+j], links[(Ly-1)*(Lx-1)+j-1], links[(Ly-1)*(Lx-1)+j], phys_ind)
-                end
-            elseif j == 1
-                tensors[j, i] = randomITensor(S, links[Ly*(Lx-1)+(i-2)*Lx+1], links[Ly*(Lx-1)+(i-1)*Lx+1], links[(i-1)*(Lx-1)+1], phys_ind)
-            elseif j == Lx
-                tensors[j, i] = randomITensor(S, links[Ly*(Lx-1)+(i-1)*Lx], links[Ly*(Lx-1)+(i)*Lx], links[i*(Lx-1)], phys_ind)
-            else
-                tensors[j, i] = randomITensor(S, links[(i-1)*(Lx-1)+j-1], links[(i-1)*(Lx-1)+j], links[Ly*(Lx-1)+(i-2)*Lx+j], links[Ly*(Lx-1)+(i-1)*Lx+j], phys_ind)
-            end
-        end
-    end
-    return tensors
-end
-
 function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=isoPEPS_tensor_init, kwargs...) where {S<:Number}
     
     tensors = tensor_init(S, hilbert, bond_dim)
@@ -162,6 +119,37 @@ function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim) where {S<:Number}
             tensors[i,j] = random_unitary(S, ingoing_inds, outgoing_inds)
             empty!(outgoing_inds)
             empty!(ingoing_inds)
+        end
+    end
+    return tensors
+end
+
+function PEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=randomITensor) where {S<:Number}
+    Lx, Ly = size(hilbert)
+
+    h_links, v_links = init_Links(hilbert; bond_dim)
+
+    # filling the matrix of tensors with random unitary ITensors wich share the same indices with their neighbours
+    tensors = Array{ITensor}(undef, Lx, Ly)
+    inds = Vector{Index{Int64}}()
+    for i in 1:Lx
+        for j in 1:Ly
+            push!(inds, hilbert[i, j])
+
+            if j != Ly
+                push!(oinds, h_links[i,j])
+            end
+            if i != Lx
+                push!(oinds, v_links[i,j])
+            end
+            if j != 1
+                push!(inds, h_links[i,j-1])
+            end
+            if i != 1
+                push!(inds, v_links[i-1,j])
+            end
+
+            tensors[i,j] = tensor_init(S, inds)
         end
     end
     return tensors
