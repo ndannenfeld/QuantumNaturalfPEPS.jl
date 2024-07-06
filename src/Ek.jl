@@ -64,7 +64,7 @@ function get_4body_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vec
 end
 
 # a function that computes the contraction of the PEPS with one/two flipped spin(s) at a position specified in key
-function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, key, h_envs)
+function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, key, fourb_envs)
     con = 1
     f = 0
     
@@ -76,6 +76,9 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
         if y[1] != y[2]
             con = peps[x[i],y[(i%2)+1]]*ITensor([(S[x[i],y[(i%2)+1]]+1)%2, S[x[i],y[(i%2)+1]]], siteind(peps,x[i],y[(i%2)+1]))*con
         end
+    end
+    if minimum(y) != 1
+        con = con*fourb_envs[2,minimum(y)-1]
     end
         
     if minimum(x) != 1
@@ -93,12 +96,9 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
         end
         f += env_down[end-maximum(x)+1].f
     end
-           
-    if minimum(y) != 1
-        con = con*h_envs[2,minimum(y)-1]
-    end
+    
     if maximum(y) != size(peps, 2)
-        con = con*h_envs[1,maximum(y)]
+        con = con*fourb_envs[1,maximum(y)]
     end
         
     return con[1], f
@@ -144,7 +144,7 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
 end
 
 # computes the local energy <sample|H|ψ>/<sample|ψ>
-function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs::Array{ITensor})
+function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs::Array{ITensor}, fourb_envs::Array{ITensor})
     terms = QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, sample .+ 1; get_flip_sites=true)
     
     row = 0
@@ -168,14 +168,8 @@ function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environme
     end
     
     # same for non-horizontal terms
-    h_envs_4b = Matrix{ITensor}(undef, 2, size(peps,2)-1)
     for key in fourBody
-        if minimum([key[1][1][1],key[2][1][1]]) != row  
-            row = minimum([key[1][1][1],key[2][1][1]])
-            get_4body_envs!(peps,env_top, env_down, sample, row, h_envs_4b)
-        end
-        
-        Ek_i, f = get_4body_term(peps, env_top, env_down, sample, key, h_envs_4b)
+        Ek_i, f = get_4body_term(peps, env_top, env_down, sample, key, fourb_envs[key[1][1][1], :, :])
         Ek += Ek_i * exp(f - logψ)*terms[key]
     end
     

@@ -123,7 +123,7 @@ function contract_recursiv!(h_envs, a, b; c=ones(length(a)), d=ones(length(a)))
     end
 end
 
-function get_all_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_4b_envs::Array{ITensor}=Array{ITensor}(undef, size(peps,1), 2, size(peps, 2)-1))
+function get_all_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_4b_envs::Array{ITensor}=Array{ITensor}(undef, size(peps,1)-1, 2, size(peps, 2)-1))
     for i in 1:size(peps,1)-1
         get_4b_envs!(peps, env_top, env_down, S, i, @view all_4b_envs[i,:,:])
     end

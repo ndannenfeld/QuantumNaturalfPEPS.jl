@@ -77,9 +77,9 @@ end
 
 PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
 
-function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=isoPEPS_tensor_init, kwargs...) where {S<:Number}
+function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, peps_init=isoPEPS_tensor_init, kwargs...) where {S<:Number}
     
-    tensors = tensor_init(S, hilbert, bond_dim)
+    tensors = peps_init(S, hilbert, bond_dim; kwargs...)
     
     return PEPS(tensors, bond_dim; kwargs...)
 end
@@ -90,7 +90,7 @@ end
 # ->[]->
 #   |
 #   v
-function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim) where {S<:Number}
+function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=random_unitary, kwargs...) where {S<:Number}
     Lx, Ly = size(hilbert)
 
     h_links, v_links = init_Links(hilbert; bond_dim)
@@ -116,7 +116,7 @@ function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim) where {S<:Number}
                 push!(ingoing_inds, v_links[i-1,j])
             end
 
-            tensors[i,j] = random_unitary(S, ingoing_inds, outgoing_inds)
+            tensors[i,j] = tensor_init(S, ingoing_inds, outgoing_inds)
             empty!(outgoing_inds)
             empty!(ingoing_inds)
         end

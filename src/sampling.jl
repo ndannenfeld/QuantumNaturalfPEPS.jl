@@ -99,8 +99,8 @@ function calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
     if row != size(peps, 1)
         C = combiner(indices_outer[end], commoninds(peps[row,size(peps, 2)], peps[row+1,size(peps, 2)]), tags = "1")
 
-        E[end] = peps.double_layer_envs[row].env[end]*delta(inds(peps.double_layer_envs[row].env[end], "-1")[1], inds(C)[1])*C*bra[end]*ket[end]
-
+        E[end] = delta(inds(peps.double_layer_envs[row].env[end], "-1")[1], inds(C)[1])*C*bra[end]*ket[end]
+        E[end] = E[end]*peps.double_layer_envs[row].env[end]
         for i in size(peps, 2)-1:-1:2
             C = combiner(indices_outer[i], commoninds(peps[row,i], peps[row+1,i]), tags = "1")
             E[i-1] = E[i]*peps.double_layer_envs[row].env[i]*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*C*ket[i]*bra[i]
@@ -171,7 +171,6 @@ function get_sample(peps::PEPS)
     
     P_S = ITensor()
     
-    psi_S = 0
     pc = 0
     # we loop through every row
     for row in 1:size(peps, 1)
