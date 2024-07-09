@@ -33,7 +33,7 @@ function generate_double_layer_env_row(peps_row, peps_row_above, contract_dim)
     E_mpo = contract(bra,ket,maxdim=contract_dim)
     
     E_mps = MPS((E_mpo.*combiner.(indices_outer, com_inds, tags="-1")).data)
-    
+    # TODO: Fix this to use the new norm baked into Environment
     normE = maximum(abs.(reshape(Array(E_mps[1], inds(E_mps[1])), :)))
     return Environment(E_mps./normE, length(bra)*log(normE))
 end
@@ -58,6 +58,7 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
 
     E_mps = apply(E_mpo.*delta.(reduce(vcat, collect.(inds.(E_mpo, "1"))), reduce(vcat, collect.(inds.(peps_double_env.env, "-1")))), peps_double_env.env, maxdim=contract_dim)
 
+    # TODO: Fix this to use the new norm baked into Environment
     normE = maximum(abs.(reshape(Array(E_mps[1], inds(E_mps[1])), :)))
     return Environment(E_mps./normE, length(bra)*log(normE)+peps_double_env.f)
 end
@@ -113,7 +114,7 @@ function calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
     end
 end
 
-# returns the 2x2 matrix P_S which is needed to sample from. Also updates sigma (used to store the contraction of already sampled sites from the left edge to the current site)
+# returns the 2x2 matrix ρ_r which is needed to sample from. Also updates sigma (used to store the contraction of already sampled sites from the left edge to the current site)
 function get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
     ket[i] = delta(siteind(peps,row,i), Index(2, "ket_phys"))*ket[i]
    
@@ -126,29 +127,28 @@ function get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
 
     
     if i == 1
-        P_S = E[i]*sigma_1
+        ρ_r = E[i]*sigma_1
     elseif i == size(peps, 2)
-        P_S = sigma*sigma_1
+        ρ_r = sigma*sigma_1
     else
-        P_S = sigma*E[i]
-        P_S = P_S*sigma_1
+        ρ_r = sigma*E[i]
+        ρ_r = ρ_r*sigma_1
     end 
     
-    return P_S, sigma_1
+    return ρ_r, sigma_1
 end
 
-# samples from P_S and updates pc
-function sample_PS!(P_S, pc)
-    p0 = abs(P_S[1,1])
-    p1 = abs(P_S[2,2])
+# samples from ρ_r and updates pc
+function sample_ρr!(ρ_r)
+    # TODO: Generalize this to more than 2 states
+    p0 = abs(ρ_r[1,1])
+    p1 = abs(ρ_r[2,2])
    
-    @assert imag(P_S[1,1]) < 1e-6
-    if rand() < p0/(p0+p1)
-        pc += log(p0/(p0+p1))
-        return p0/(p0+p1), 0, pc
+    @assert imag(ρ_r[1,1]) < 1e-6
+    if rand() < p0/(p0+p1) 
+        return 0, p0/(p0+p1)
     else
-        pc += log(p1/(p0+p1))
-        return p1/(p0+p1), 1, pc
+        return 1, p1/(p0+p1)
     end
 end
 
@@ -169,9 +169,9 @@ function get_sample(peps::PEPS)
     
     env_top = Array{Environment}(undef, size(peps, 1)-1)
     
-    P_S = ITensor()
+    ρ_r = ITensor()
     
-    pc = 0
+    logpc = 0
     # we loop through every row
     for row in 1:size(peps, 1)
         sigma = 1
@@ -184,20 +184,21 @@ function get_sample(peps::PEPS)
         for i in 1:size(peps, 2)
             
             # calculate the 2x2 matrix from which we sample
-            P_S, sigma_1 = get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
+            ρ_r, sigma_1 = get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
             
-            # sample from P_S
-            norm_factor, S[row,i], pc = sample_PS!(P_S, pc)
+            # sample from ρ_r
+            S[row, i], pc = sample_ρr(ρ_r)
+            logpc += log(pc)
             
             # store the contraction of sampled sites in sigma
-            sigma = update_sigma(peps, sigma, sigma_1, S[row,i], i, row, norm_factor)                        
+            sigma = update_sigma(peps, sigma, sigma_1, S[row, i], i, row, pc)                        
         end
         
         # the sampled bra is used to generate the top environments
         bra = bra.*[ITensor([(S[row,i]+1)%2, S[row,i]], siteind(peps, row, i)) for i in 1:size(peps, 2)]
-            
+        # TODO: Fix this to use the new norm baked into Environment
         if row != size(peps, 1)
-            norm_bra = maximum(abs.(reshape(Array(bra[1], inds(bra[1])), :)))
+            norm_bra = maximum(abs.(reshape(Array(bra[1], inds(bra[1])), :))) 
             if row == 1
                 env_top[row] = Environment(MPS(bra.data)./norm_bra, length(bra)*log(norm_bra)) 
             else
@@ -206,5 +207,5 @@ function get_sample(peps::PEPS)
         end
     end
     
-    return S, pc, env_top
+    return S, logpc, env_top
 end

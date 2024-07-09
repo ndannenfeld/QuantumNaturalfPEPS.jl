@@ -79,7 +79,7 @@ PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64
 
 function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, peps_init=isoPEPS_tensor_init, kwargs...) where {S<:Number}
     
-    tensors = peps_init(S, hilbert, bond_dim; kwargs...)
+    tensors = peps_init(S, hilbert, bond_dim; kwargs...) # TODO: Kwargs should be passed to just one downstream function
     
     return PEPS(tensors, bond_dim; kwargs...)
 end
@@ -90,7 +90,7 @@ end
 # ->[]->
 #   |
 #   v
-function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=random_unitary, kwargs...) where {S<:Number}
+function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=random_unitary, kwargs...) where {S<:Number} # TODO: Remove unsused kwargs
     Lx, Ly = size(hilbert)
 
     h_links, v_links = init_Links(hilbert; bond_dim)
@@ -117,8 +117,6 @@ function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=random_un
             end
 
             tensors[i,j] = tensor_init(S, ingoing_inds, outgoing_inds)
-            empty!(outgoing_inds)
-            empty!(ingoing_inds)
         end
     end
     return tensors
