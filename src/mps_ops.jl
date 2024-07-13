@@ -1,7 +1,7 @@
 # From abstractmps.jl
 function _log_or_not_dot(
     M1::MPST, M2::MPST, loginner::Bool; dag=true, make_inds_match::Bool=true
-  )::Number where {MPST<:AbstractMPS}
+  )::Number where {MPST<:ITensors.AbstractMPS}
     N = length(M1)
     if length(M2) != N
       throw(DimensionMismatch("inner: mismatched lengths $N and $(length(M2))"))

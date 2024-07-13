@@ -37,7 +37,9 @@ function flatten(peps::PEPS) # Flattens the tensors into a vector
     for i in 1:size(peps, 1)
         for j in 1:size(peps, 2)
             shift = prod(dim.(inds(peps[i,j])))
-            θ[pos:pos+shift-1] = reshape(Array(peps[i,j], inds(peps[i,j])), :)
+            x = @view θ[pos:pos+shift-1]
+            permute_reshape_and_copy!(x, peps[i,j], (siteind(peps,i,j), QuantumNaturalfPEPS.linkinds(peps,i,j)...))
+            #permute_reshape_and_copy!(x, peps[i,j], (QuantumNaturalfPEPS.linkinds(peps,i,j)..., siteind(peps,i,j)))
             pos = pos+shift
         end
     end
@@ -77,31 +79,31 @@ end
 
 PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
 
-function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, peps_init=isoPEPS_tensor_init, kwargs...) where {S<:Number}
+function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, kwargs...) where {S<:Number}
     
-    tensors = peps_init(S, hilbert, bond_dim; kwargs...) # TODO: Kwargs should be passed to just one downstream function
-    
+    tensors = isoPEPS_tensor_init(S, hilbert, bond_dim; tensor_init)
     return PEPS(tensors, bond_dim; kwargs...)
 end
 
-# TODO: Write an alternative initializer that initializes the peps as an isopeps
+# alternative initializer that initializes the peps as an isopeps
 #   |
 #   v /
 # ->[]->
 #   |
 #   v
-function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=random_unitary, kwargs...) where {S<:Number} # TODO: Remove unsused kwargs
+function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=random_unitary) where {S<:Number}
     Lx, Ly = size(hilbert)
 
     h_links, v_links = init_Links(hilbert; bond_dim)
 
     # filling the matrix of tensors with random unitary ITensors wich share the same indices with their neighbours
     tensors = Array{ITensor}(undef, Lx, Ly)
-    outgoing_inds = Vector{Index{Int64}}()
-    ingoing_inds = Vector{Index{Int64}}()
     for i in 1:Lx
         for j in 1:Ly
+            outgoing_inds = Vector{Index{Int64}}()
+            ingoing_inds = Vector{Index{Int64}}()
             push!(ingoing_inds, hilbert[i, j])
+
 
             if j != Ly
                 push!(outgoing_inds, h_links[i,j])
@@ -220,7 +222,7 @@ function get_projected(peps::PEPS, S, i, j)
     return peps[i,j] * get_projector(S[i, j], index)
 end
 
-get_projected(peps::PEPS, S) = [get_projected(peps, S, i, j)  for i in 1:size(S, 1), j in 1:size(S, 2)]
+get_projected(peps::PEPS, S::Matrix{Int64}) = [get_projected(peps, S, i, j)  for i in 1:size(S, 1), j in 1:size(S, 2)]
 
 function contract_peps_exact(peps)
     x = 1

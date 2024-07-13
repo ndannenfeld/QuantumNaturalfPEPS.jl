@@ -35,19 +35,30 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
             shift = prod(dim.(inds(Ok_Tensor)))
             if S[i,j] == 1
                 # Fill with zeros instead
-                Ok[pos:pos+shift-1] .= 0
-                pos = pos+shift
-                
-                x = @view Ok[pos:pos+shift-1]
+                Ok[pos:2:pos+2*shift-1] .= 0
+    
+                x = @view Ok[pos+1:2:pos+2*shift-1]
                 permute_reshape_and_copy!(x, Ok_Tensor, linkinds(peps,i,j))
             else
-                x = @view Ok[pos:pos+shift-1]
+                x = @view Ok[pos:2:pos+2*shift-1]
                 permute_reshape_and_copy!(x, Ok_Tensor, linkinds(peps,i,j))
-                pos = pos+shift
-                Ok[pos:pos+shift-1] .= 0
+                
+                Ok[pos+1:2:pos+2*shift-1] .= 0
             end
-            pos = pos+shift
+            pos = pos+2*shift
         end
     end
     return Ok
+end
+
+function numerical_Ok(peps::PEPS, S::Matrix{Int64}, direction, logψ; dt=0.01)
+    p2 = deepcopy(peps)
+    θ = flatten(peps)
+    f = 0
+    for i in [-1,1]
+        write!(p2, θ + i*dt*direction)
+        x = get_projected(p2, S)
+        f += i*contract_peps_exact(x)
+    end
+    return f/(2*dt) *convert_if_real(exp(-logψ))
 end

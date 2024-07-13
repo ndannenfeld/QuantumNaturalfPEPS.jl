@@ -139,8 +139,8 @@ function get_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{
 end
 
 function get_4b_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs)
-    peps_i = get_projected(peps, S)[i,:] 
-    peps_j = get_projected(peps, S)[i+1,:]
+    peps_i = get_projected(peps, S, i, :)  
+    peps_j = get_projected(peps, S, i+1, :)
 
     if i == 1
         contract_recursiv!(fourb_envs, peps_i, peps_j, c=env_down[end-1].env)
