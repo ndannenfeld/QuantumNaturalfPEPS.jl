@@ -8,13 +8,12 @@ end
 
 # renames all inner indices in a MPO/MPS
 function rename_indices!(ket)
-    indices_inner = Array{Index}(undef, length(ket)-1)
-    for i in 1:length(indices_inner)
-        indices_inner[i] = Index(maxlinkdim(ket), "Ket_inner_$(i)")
+    for i in 1:length(ket)-1
+        new_ind = Index(maxlinkdim(ket), "Ket_inner_$(i)")
         old_ind = commoninds(ket[i], ket[i+1])
 
-        ket[i] = ket[i]*delta(indices_inner[i], old_ind)
-        ket[i+1] = ket[i+1]*delta(indices_inner[i], old_ind)
+        ket[i] = ket[i]*delta(new_ind, old_ind)
+        ket[i+1] = ket[i+1]*delta(new_ind, old_ind)
     end
 end
 
@@ -33,9 +32,6 @@ function generate_double_layer_env_row(peps_row, peps_row_above, contract_dim)
     E_mpo = contract(bra,ket,maxdim=contract_dim)
     
     E_mps = MPS((E_mpo.*combiner.(indices_outer, com_inds, tags="-1")).data)
-    # TODO: Fix this to use the new norm baked into Environment
-    #normE = maximum(abs.(reshape(Array(E_mps[1], inds(E_mps[1])), :)))
-    #return Environment(E_mps./normE, length(bra)*log(normE))
     return Environment(E_mps; normalize=true)
 end
 
@@ -59,9 +55,6 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
 
     E_mps = apply(E_mpo.*delta.(reduce(vcat, collect.(inds.(E_mpo, "1"))), reduce(vcat, collect.(inds.(peps_double_env.env, "-1")))), peps_double_env.env, maxdim=contract_dim)
 
-    # TODO: Fix this to use the new norm baked into Environment
-    #normE = maximum(abs.(reshape(Array(E_mps[1], inds(E_mps[1])), :)))
-    #return Environment(E_mps./normE, length(bra)*log(normE)+peps_double_env.f)
     return Environment(E_mps, peps_double_env.f; normalize=true)
 end
 
@@ -83,12 +76,12 @@ end
 # calculates the bra and the ket layer and applies (if available) already sampled rows (from above)
 function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
     bra = MPO(peps[row, :])
-    ket = copy(bra)
 
-    if row != 1      
-        bra = apply(bra, env_top[row-1].env, maxdim=peps.sample_dim)
-        ket = apply(ket, env_top[row-1].env, maxdim=peps.sample_dim)
+    if row != 1   
+        bra = contract(bra, env_top[row-1].env, maxdim=peps.sample_dim)
     end
+
+    ket = copy(bra)
     rename_indices!(ket)
     
     if row != size(peps, 1)
@@ -102,8 +95,7 @@ function calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
     if row != size(peps, 1)
         C = combiner(indices_outer[end], commoninds(peps[row,size(peps, 2)], peps[row+1,size(peps, 2)]), tags = "1")
 
-        E[end] = delta(inds(peps.double_layer_envs[row].env[end], "-1")[1], inds(C)[1])*C*bra[end]*ket[end]
-        E[end] = E[end]*peps.double_layer_envs[row].env[end]
+        E[end] = peps.double_layer_envs[row].env[end]*delta(inds(peps.double_layer_envs[row].env[end], "-1")[1], inds(C)[1])*C*bra[end]*ket[end]
         for i in size(peps, 2)-1:-1:2
             C = combiner(indices_outer[i], commoninds(peps[row,i], peps[row+1,i]), tags = "1")
             E[i-1] = E[i]*peps.double_layer_envs[row].env[i]*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*C*ket[i]*bra[i]
@@ -122,22 +114,20 @@ function get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
    
     if row != size(peps, 1)
         C = combiner(indices_outer[i], commoninds(peps[row,i], peps[row+1,i]), tags = "1")
-        sigma_1 = bra[i]*ket[i]*C*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*peps.double_layer_envs[row].env[i]
+        sigma *= peps.double_layer_envs[row].env[i]*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*C*bra[i]*ket[i]
     else
-        sigma_1 = bra[i]*ket[i]
+        sigma *= bra[i]*ket[i]
     end
 
-    
     if i == 1
-        ρ_r = E[i]*sigma_1
+        ρ_r = E[i]*sigma
     elseif i == size(peps, 2)
-        ρ_r = sigma*sigma_1
+        ρ_r = sigma
     else
         ρ_r = sigma*E[i]
-        ρ_r = ρ_r*sigma_1
     end 
     
-    return ρ_r, sigma_1
+    return ρ_r, sigma
 end
 
 # samples from ρ_r and updates pc
@@ -155,16 +145,15 @@ function sample_ρr(ρ_r)
 end
 
 # after the sampling of the current site, it is fixed and its contraction with the aleady sampled sites is stored in sigma
-function update_sigma(peps, sigma, sigma_1, S, i, row, norm_factor)
-    s = (sigma_1*sigma)* ITensor([(S+1)%2, S], siteind(peps, row, i))
-    return (s)* ITensor([(S+1)%2, S], inds(sigma_1, "ket_phys")) / norm_factor
+function update_sigma(peps, sigma, S, i, row, norm_factor)
+    s = sigma* ITensor([(S+1)%2, S], siteind(peps, row, i))*ITensor([(S+1)%2, S], inds(sigma, "ket_phys"))
+    return (s) / norm_factor
 end
 
 # generates a sample of a given peps along with pc and the top environments
 function get_sample(peps::PEPS)
     S = Array{Int64}(undef, size(peps))
     
-    indices_inner = Array{Index}(undef, size(peps, 2)-1)
     indices_outer = Array{Index}(undef, size(peps, 2))
     
     E = Array{ITensor}(undef, size(peps, 2)-1)
@@ -186,26 +175,22 @@ function get_sample(peps::PEPS)
         for i in 1:size(peps, 2)
             
             # calculate the 2x2 matrix from which we sample
-            ρ_r, sigma_1 = get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
+            ρ_r, sigma = get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
             
             # sample from ρ_r
             S[row, i], pc = sample_ρr(ρ_r)
             logpc += log(pc)
             
             # store the contraction of sampled sites in sigma
-            sigma = update_sigma(peps, sigma, sigma_1, S[row, i], i, row, pc)                        
+            sigma = update_sigma(peps, sigma, S[row, i], i, row, pc)                        
         end
         
         # the sampled bra is used to generate the top environments
         bra = bra.*[ITensor([(S[row,i]+1)%2, S[row,i]], siteind(peps, row, i)) for i in 1:size(peps, 2)]
-        # TODO: Fix this to use the new norm baked into Environment
-        if row != size(peps, 1)
-            #norm_bra = maximum(abs.(reshape(Array(bra[1], inds(bra[1])), :))) 
+        if row != size(peps, 1) 
             if row == 1
-                #env_top[row] = Environment(MPS(bra.data)./norm_bra, length(bra)*log(norm_bra)) 
                 env_top[row] = Environment(MPS(bra.data); normalize=true)
             else
-                #env_top[row] = Environment(bra./norm_bra, length(bra)*log(norm_bra)+env_top[row-1].f)
                 env_top[row] = Environment(MPS(bra.data), env_top[row-1].f; normalize=true)
             end
         end
