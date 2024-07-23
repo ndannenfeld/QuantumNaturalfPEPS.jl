@@ -41,16 +41,15 @@ function Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum, sample_
     Ok = Matrix{eltype_}(undef, sample_nr, length(peps))
     E_loc = Vector{eltype_}(undef, sample_nr)
     logψ = Vector{Complex{eltype_real}}(undef, sample_nr)
-    S = Vector{Matrix{Int}}(undef, sample_nr)
-    pc = Vector{eltype_real}(undef, sample_nr)
+    samples = Vector{Matrix{Int}}(undef, sample_nr)
+    logpc = Vector{eltype_real}(undef, sample_nr)
 
     for i in 1:sample_nr
         Ok_view = @view Ok[i, :]
-        _, E_loc[i], logψ[i], S[i], pc[i] = Ok_and_Ek(peps, ham_op; timer, Ok=Ok_view, kwargs...)
-        #Ok[i,:], E_loc[i], logψ[i], S[i], pc[i] = Ok_and_Ek(peps, ham_op; timer, kwargs...)
+        _, E_loc[i], logψ[i], samples[i], logpc[i] = Ok_and_Ek(peps, ham_op; timer, Ok=Ok_view, kwargs...)
     end
     
-    return Ok, E_loc, logψ, S, compute_importance_weights(logψ, pc)
+    return Ok, E_loc, logψ, samples, compute_importance_weights(logψ, logpc)
     # returns Gradient, local Energy, log(<ψ|S>), samples S, p
 end
 
@@ -84,7 +83,7 @@ function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_w
     Threads.@threads for i in 1:nr_threads
         for j in 1:k
             Ok = @view Oks[:, j, i]
-            _, Eks[j, i], logψs[j, i], samples[j, i], logpcs[j, i], _ = Ok_and_Ek(peps, ham_op; Ok, kwargs...)
+            _, Eks[j, i], logψs[j, i], samples[j, i], logpcs[j, i] = Ok_and_Ek(peps, ham_op; Ok, kwargs...)
         end
 
     end
