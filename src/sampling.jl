@@ -3,6 +3,8 @@ function rename_indices!(ket, indices_outer, changing_inds)
     for i in 1:length(indices_outer)
         indices_outer[i] = Index(dim(changing_inds[i]), "Ket_$(i)")
         ket[i] = ket[i]*delta(changing_inds[i], indices_outer[i])
+        # TODO: Use the subsinds function defined in tensor_ops.jl instead. Or alternative use the prime() function from ITensors.jl
+        # ket[i] = subsinds(ket[i], changing_inds[i], indices_outer[i])
     end  
 end
 

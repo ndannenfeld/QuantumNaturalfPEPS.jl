@@ -33,6 +33,17 @@ end
 
 random_unitary(i1::Vector{Index{Int64}}, i2::Vector{Index{Int64}}) = random_unitary(Float64, i1, i2)
 
+"""
+    subsinds(T, indx_orig::Index, indx_tar::Index)
+Substitute the index `indx_orig` by `indx_tar` in the tensor `T`.
+"""
+function subsinds(T, indx_orig::Index, indx_tar::Index)
+  inds_ = collect(inds(T))
+  i = findfirst(x -> x == indx_orig, inds_)
+  inds_[i] = indx_tar
+  return ITensors.setinds(T, inds_)
+end
+
 function ITensors.combiner(is::ITensors.Indices; target_ind=nothing, kwargs...)
     tags = get(kwargs, :tags, "CMB,Link")
       if target_ind === nothing
