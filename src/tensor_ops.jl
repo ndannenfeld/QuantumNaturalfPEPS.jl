@@ -40,6 +40,10 @@ Substitute the index `indx_orig` by `indx_tar` in the tensor `T`.
 function subsinds(T, indx_orig::Index, indx_tar::Index)
   inds_ = collect(inds(T))
   i = findfirst(x -> x == indx_orig, inds_)
+  if i === nothing
+    @warn "Index $indx_orig not found in tensor $T"
+    return T
+  end
   inds_[i] = indx_tar
   return ITensors.setinds(T, inds_)
 end
