@@ -32,3 +32,12 @@ function random_unitary(::Type{ElT}, i1::Vector{Index{Int64}}, i2::Vector{Index{
 end
 
 random_unitary(i1::Vector{Index{Int64}}, i2::Vector{Index{Int64}}) = random_unitary(Float64, i1, i2)
+
+function ITensors.combiner(is::ITensors.Indices; target_ind=nothing, kwargs...)
+    tags = get(kwargs, :tags, "CMB,Link")
+      if target_ind === nothing
+        target_ind = Index(prod(dims(is)), tags)
+      end
+    new_is = (target_ind, is...)
+    return itensor(ITensors.Combiner(), new_is)
+end

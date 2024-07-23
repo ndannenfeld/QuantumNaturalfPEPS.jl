@@ -31,29 +31,37 @@ function generate_double_layer_env_row(peps_row, peps_row_above, contract_dim)
 
     E_mpo = contract(bra,ket,maxdim=contract_dim)
     
-    E_mps = MPS((E_mpo.*combiner.(indices_outer, com_inds, tags="-1")).data)
+    E_mps = MPS((E_mpo.*combiner.(indices_outer, com_inds, tags="up")).data)
     return Environment(E_mps; normalize=true)
 end
 
 function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below, peps_double_env, contract_dim)
-    C = Array{Array{ITensor}}(undef, 2)
+    C = Array{ITensor}(undef, 2, length(peps_row))
     indices_outer = Array{Index}(undef, length(peps_row))
 
     bra = conj(MPO(peps_row))
     ket = copy(MPO(peps_row))
     
-    rename_indices!(ket, indices_outer, commoninds.(peps_row, peps_row_above))
-    C[1] = combiner.(indices_outer, commoninds.(peps_row, peps_row_above), tags="$(-1)")
-    rename_indices!(ket, indices_outer, commoninds.(peps_row, peps_row_below))
-    C[2] = combiner.(indices_outer, commoninds.(peps_row, peps_row_below), tags="$(1)")
+    com_inds = commoninds.(peps_row, peps_row_above)
+    rename_indices!(ket, indices_outer, com_inds)
+    for i in 1:length(peps_row)
+        C[1,i] = combiner(indices_outer[i], com_inds[i], tags="up")
+    end
+
+    com_inds = commoninds.(peps_row, peps_row_below)
+    rename_indices!(ket, indices_outer, com_inds)
+    for i in 1:length(peps_row)
+        C[2,i] = combiner(indices_outer[i], com_inds[i]; target_ind=reduce(vcat, inds(peps_double_env.env[i], "up")), tags="down")
+    end
 
     rename_indices!(ket)
 
-    E_mpo = contract(bra,ket,maxdim=contract_dim)
-    E_mpo = E_mpo.*C[1]
-    E_mpo = E_mpo.*C[2]
+    E_mpo = bra.*ket
+    
+    E_mpo = E_mpo.*C[1,:]
+    E_mpo = E_mpo.*C[2,:]
 
-    E_mps = apply(E_mpo.*delta.(reduce(vcat, collect.(inds.(E_mpo, "1"))), reduce(vcat, collect.(inds.(peps_double_env.env, "-1")))), peps_double_env.env, maxdim=contract_dim)
+    E_mps = apply(E_mpo, peps_double_env.env, maxdim=contract_dim)
 
     return Environment(E_mps, peps_double_env.f; normalize=true)
 end
@@ -93,17 +101,24 @@ end
 # calculates the unsampled contractions along a row (from right to left the sites are contracted along the physical Index)
 function calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
     if row != size(peps, 1)
-        C = combiner(indices_outer[end], commoninds(peps[row,size(peps, 2)], peps[row+1,size(peps, 2)]), tags = "1")
+        com_inds = commoninds(peps[row,size(peps, 2)], peps[row+1,size(peps, 2)])
+        C = combiner(indices_outer[end], com_inds; target_ind=inds(peps.double_layer_envs[row].env[end], "up")[1])
 
-        E[end] = peps.double_layer_envs[row].env[end]*delta(inds(peps.double_layer_envs[row].env[end], "-1")[1], inds(C)[1])*C*bra[end]*ket[end]
+        E[end] = peps.double_layer_envs[row].env[end]*C*bra[end]*ket[end]
         for i in size(peps, 2)-1:-1:2
-            C = combiner(indices_outer[i], commoninds(peps[row,i], peps[row+1,i]), tags = "1")
-            E[i-1] = E[i]*peps.double_layer_envs[row].env[i]*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*C*ket[i]*bra[i]
+            com_inds = commoninds(peps[row,i], peps[row+1,i])
+            C = combiner(indices_outer[i], com_inds; target_ind=inds(peps.double_layer_envs[row].env[i], "up")[1])
+
+            uncombined_double_layer = peps.double_layer_envs[row].env[i]*C
+            E[i-1] = E[i]*ket[i]
+            E[i-1] *= uncombined_double_layer
+            E[i-1] *= bra[i]
         end
     else
         E[end] = bra[end]*ket[end]
         for i in size(peps, 2)-1:-1:2
-            E[i-1] = E[i]*bra[i]*ket[i]
+            E[i-1] = ket[i]*E[i]
+            E[i-1] *= bra[i]
         end
     end
 end
@@ -113,10 +128,16 @@ function get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
     ket[i] = delta(siteind(peps,row,i), Index(2, "ket_phys"))*ket[i]
    
     if row != size(peps, 1)
-        C = combiner(indices_outer[i], commoninds(peps[row,i], peps[row+1,i]), tags = "1")
-        sigma *= peps.double_layer_envs[row].env[i]*delta(inds(peps.double_layer_envs[row].env[i], "-1")[1], inds(C)[1])*C*bra[i]*ket[i]
+        com_inds = commoninds(peps[row,i], peps[row+1,i])
+        C = combiner(indices_outer[i], com_inds; target_ind=inds(peps.double_layer_envs[row].env[i], "up")[1])
+        
+        uncombined_double_layer = peps.double_layer_envs[row].env[i]*C
+        sigma *= ket[i]
+        sigma *= uncombined_double_layer
+        sigma *= bra[i]
     else
-        sigma *= bra[i]*ket[i]
+        sigma *= ket[i]
+        sigma *= bra[i]
     end
 
     if i == 1
@@ -146,7 +167,7 @@ end
 
 # after the sampling of the current site, it is fixed and its contraction with the aleady sampled sites is stored in sigma
 function update_sigma(peps, sigma, S, i, row, norm_factor)
-    s = sigma* ITensor([(S+1)%2, S], siteind(peps, row, i))*ITensor([(S+1)%2, S], inds(sigma, "ket_phys"))
+    s = sigma* get_projector(S, siteind(peps, row, i))
     return (s) / norm_factor
 end
 
