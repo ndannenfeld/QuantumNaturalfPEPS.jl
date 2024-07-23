@@ -53,7 +53,7 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
     com_inds = commoninds.(peps_row, peps_row_below)
     rename_indices!(ket, indices_outer, com_inds)
     for i in 1:length(peps_row)
-        C[2,i] = combiner(indices_outer[i], com_inds[i]; target_ind=reduce(vcat, inds(peps_double_env.env[i], "up")), tags="down")
+        C[2,i] = combiner_tar(indices_outer[i], com_inds[i]; target_ind=reduce(vcat, inds(peps_double_env.env[i], "up")), tags="down")
     end
 
     rename_indices!(ket)
@@ -104,15 +104,17 @@ end
 function calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
     if row != size(peps, 1)
         com_inds = commoninds(peps[row,size(peps, 2)], peps[row+1,size(peps, 2)])
-        C = combiner(indices_outer[end], com_inds; target_ind=inds(peps.double_layer_envs[row].env[end], "up")[1])
+        combined_indx = inds(peps.double_layer_envs[row].env[end], "up")[1]
+        C = combiner_tar(indices_outer[end], com_inds; target_ind=combined_indx)
 
         E[end] = peps.double_layer_envs[row].env[end]*C*bra[end]*ket[end]
         for i in size(peps, 2)-1:-1:2
             com_inds = commoninds(peps[row,i], peps[row+1,i])
-            C = combiner(indices_outer[i], com_inds; target_ind=inds(peps.double_layer_envs[row].env[i], "up")[1])
+            combined_indx = inds(peps.double_layer_envs[row].env[i], "up")[1]
+            C = combiner_tar(indices_outer[i], com_inds; target_ind=combined_indx)
 
-            uncombined_double_layer = peps.double_layer_envs[row].env[i]*C
-            E[i-1] = E[i]*ket[i]
+            uncombined_double_layer = peps.double_layer_envs[row].env[i] * C
+            E[i-1] = E[i] * ket[i]
             E[i-1] *= uncombined_double_layer
             E[i-1] *= bra[i]
         end
@@ -131,7 +133,7 @@ function get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
    
     if row != size(peps, 1)
         com_inds = commoninds(peps[row,i], peps[row+1,i])
-        C = combiner(indices_outer[i], com_inds; target_ind=inds(peps.double_layer_envs[row].env[i], "up")[1])
+        C = combiner_tar(indices_outer[i], com_inds; target_ind=inds(peps.double_layer_envs[row].env[i], "up")[1])
         
         uncombined_double_layer = peps.double_layer_envs[row].env[i]*C
         sigma *= ket[i]

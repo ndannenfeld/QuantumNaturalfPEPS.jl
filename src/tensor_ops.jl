@@ -48,7 +48,7 @@ function subsinds(T, indx_orig::Index, indx_tar::Index)
   return ITensors.setinds(T, inds_)
 end
 
-function ITensors.combiner(is::ITensors.Indices; target_ind=nothing, kwargs...)
+function combiner_tar(is::ITensors.Indices; target_ind=nothing, kwargs...)
     tags = get(kwargs, :tags, "CMB,Link")
       if target_ind === nothing
         target_ind = Index(prod(dims(is)), tags)
@@ -56,3 +56,6 @@ function ITensors.combiner(is::ITensors.Indices; target_ind=nothing, kwargs...)
     new_is = (target_ind, is...)
     return itensor(ITensors.Combiner(), new_is)
 end
+
+combiner_tar(is...; kwargs...) = combiner_tar(ITensors.indices(is...); kwargs...)
+combiner_tar(i::Index; kwargs...) = combiner_tar((i,); kwargs...)
