@@ -54,7 +54,7 @@ function Base.length(peps::PEPS)
     return x
 end
 
-function write!(peps::PEPS, θ::Vector{T}) where T# Writes the vector θ into the tensors.
+function write!(peps::PEPS, θ::Vector{T}; reset_double_layer=true) where T# Writes the vector θ into the tensors.
     @assert eltype(peps) == T "The type of the PEPS and the vector θ must be the same type $T != $(eltype(peps))"
     pos = 1
     for i in 1:size(peps, 1)
@@ -64,7 +64,9 @@ function write!(peps::PEPS, θ::Vector{T}) where T# Writes the vector θ into th
             pos += shift
         end
     end
-    peps.double_layer_envs = nothing
+    if reset_double_layer
+        peps.double_layer_envs = nothing
+    end
 end
 
 ITensors.siteinds(type, Lx, Ly) = [siteind(type; addtags="nx=$i,ny=$j") for i in 1:Lx, j in 1:Ly]

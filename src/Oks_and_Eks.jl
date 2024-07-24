@@ -25,7 +25,10 @@ end
 ###### Single threaded
 # this function returns a Ok_and_Eks function wich can be used to optimise via QNG.evolve
 function generate_Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), kwargs...)
-    function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer) where T
+    function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer; kwargs2...) where T
+        if length(kwargs2) > 0
+            kwargs = merge(kwargs, kwargs2)
+        end
         write!(peps, Θ)
         @timeit timer "double_layer_envs" update_double_layer_envs!(peps) # update the double layer environments once for the peps 
         return Oks_and_Eks_singlethread(peps, ham_op, sample_nr; timer=timer, kwargs...)
@@ -55,17 +58,22 @@ end
 
 ###### Multiple threads
 function generate_Oks_and_Eks_threaded(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), kwargs...)
-    function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer) where T
-        write!(peps, Θ)
-        @timeit timer "double_layer_envs" update_double_layer_envs!(peps) # update the double layer environments once for the peps 
-        return Oks_and_Eks_threaded(peps, ham_op, sample_nr; timer=timer, kwargs...)
+    function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer; reset_double_layer=true, kwargs2...) where T
+        if length(kwargs2) > 0
+            kwargs = merge(kwargs, kwargs2)
+        end
+        write!(peps, Θ; reset_double_layer)
+        if reset_double_layer
+            @timeit timer "double_layer_envs" update_double_layer_envs!(peps) # update the double layer environments once for the peps
+        end
+        return Oks_and_Eks_threaded(peps, ham_op, sample_nr; timer, kwargs...)
     end
     return Oks_and_Eks_
 end
 
 function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_weights=true,
-                                               timer=TimerOutput(), kwargs...)
-    nr_threads = Threads.nthreads()
+                                               timer=TimerOutput(), nr_threads=Threads.nthreads(), kwargs...)
+    
     nr_parameters = length(peps)
     k = ceil(Int, sample_nr / nr_threads)
     
@@ -105,7 +113,10 @@ end
 #### Multiprocessing
 
 function generate_Oks_and_Eks_multiproc(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), threaded=true, kwargs...)
-    function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer) where T
+    function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer; kwargs2...) where T
+        if length(kwargs2) > 0
+            kwargs = merge(kwargs, kwargs2)
+        end
         write!(peps, Θ)
         @timeit timer "double_layer_envs" update_double_layer_envs!(peps) # update the double layer environments once for the peps
         return Oks_and_Eks_multiproc(peps, ham_op, sample_nr; kwargs...)
