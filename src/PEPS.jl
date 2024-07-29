@@ -5,7 +5,13 @@ mutable struct PEPS
     sample_dim::Integer
     contract_dim::Integer
     double_contract_dim::Integer
-    PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim) = new(tensors, nothing, bond_dim, sample_dim, contract_dim, double_contract_dim)
+    function PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim, shift=true)
+        peps = new(tensors, nothing, bond_dim, sample_dim, contract_dim, double_contract_dim)
+        if shift
+            shift!(peps)
+        end
+        return peps
+    end
 end
 
 Base.size(peps::PEPS, args...) = size(peps.tensors, args...)
@@ -52,6 +58,14 @@ function Base.length(peps::PEPS)
         x += prod(size(ten))
     end
     return x
+end
+
+function shift!(peps::PEPS)
+    for peps_i in peps.tensors
+        shift = std(peps_i.tensor.storage)
+        peps_i .+= 2*shift 
+    end
+    return peps
 end
 
 function write!(peps::PEPS, θ::Vector{T}; reset_double_layer=true) where T# Writes the vector θ into the tensors.

@@ -29,7 +29,7 @@ function Test_Ek(peps::PEPS, ham_op; it=1)
         fourb_envs = get_all_4b_envs(peps, env_top, env_down, S)
 
         E[i] = get_Ek(peps, ham_op, env_top, env_down, S, logψ, h_envs, fourb_envs)
-        Enum[i] = QuantumNaturalGradient.get_Ek(S.+1, ham_op, func)
+        Enum[i] = convert_if_real(QuantumNaturalGradient.get_Ek(S.+1, ham_op, func))
     end
 
     return E, Enum
