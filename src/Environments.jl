@@ -89,64 +89,77 @@ function logψ_exact(peps, sample)
     return log(Complex(con))
 end
 
-function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_horizontal_envs::Array{ITensor}=Array{ITensor}(undef, size(peps,1), 2, size(peps, 2)-1))
+function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_horizontal_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps,1), size(peps, 2)-1), all_horizontal_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps,1), size(peps, 2)-1))
     for i in 1:size(peps,1)
-        get_horizontal_envs!(peps, env_top, env_down, S, i, @view all_horizontal_envs[i,:,:])
+        view_r = @view all_horizontal_envs_r[i,:]
+        view_l = @view all_horizontal_envs_l[i,:]
+        get_horizontal_envs!(peps, env_top, env_down, S, i, view_r, view_l)
     end
-    return all_horizontal_envs
+    return all_horizontal_envs_r, all_horizontal_envs_l
 end
 
-function get_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs=Matrix{ITensor}(undef, 2,size(peps, 2)-1))
-    get_horizontal_envs!(peps, env_top, env_down,S,i,horizontal_envs)
-    return horizontal_envs
+function get_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs_r=Matrix{ITensor}(undef, size(peps, 2)-1), horizontal_envs_l=Matrix{ITensor}(undef, size(peps, 2)-1))
+    get_horizontal_envs!(peps, env_top, env_down,S,i,horizontal_envs_r, horizontal_envs_l)
+    return horizontal_envs_r, horizontal_envs_l
 end
 
 # this function computes the horizontal environments for a given row
-function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs)
+function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs_r, horizontal_envs_l)
     peps_i = get_projected(peps, S, i, :)    #contract the row with S
     
     # now we loop through every site and compute the environments (once from the right and once from the left) by MPO-MPS contraction.
     if i == 1
-        contract_recursiv!(horizontal_envs, peps_i, env_down[end].env)
+        contract_recursiv!(horizontal_envs_r, peps_i, env_down[end].env)
+        contract_recursiv!(horizontal_envs_l, peps_i, env_down[end].env, right_to_left=false)
     elseif i == size(peps, 1)
-        contract_recursiv!(horizontal_envs, peps_i, env_top[end].env)
+        contract_recursiv!(horizontal_envs_r, peps_i, env_top[end].env)
+        contract_recursiv!(horizontal_envs_l, peps_i, env_top[end].env, right_to_left=false)
     else
-        contract_recursiv!(horizontal_envs, env_top[i-1].env, peps_i; c=env_down[end-i+1].env)
+        contract_recursiv!(horizontal_envs_r, env_top[i-1].env, peps_i; c=env_down[end-i+1].env)
+        contract_recursiv!(horizontal_envs_l, env_top[i-1].env, peps_i; c=env_down[end-i+1].env, right_to_left=false)
     end
 end
 
-function contract_recursiv!(h_envs, a, b; c=ones(length(a)), d=ones(length(a)))
-    h_envs[1,end] = a[end]*b[end]*c[end]*d[end]
-    h_envs[2,1] = a[1]*b[1]*c[1]*d[1]
-    for j in length(a)-1:-1:2
-        h_envs[1,j-1] = h_envs[1,j]*a[j]*b[j]*c[j]*d[j]
-    end
-    for j in 2:length(a)-1
-        h_envs[2,j] = h_envs[2,j-1]*a[j]*b[j]*c[j]*d[j]
+function contract_recursiv!(h_envs, a, b; c=ones(length(a)), d=ones(length(a)), right_to_left=true)
+    if right_to_left
+        h_envs[end] = a[end]*b[end]*c[end]*d[end]
+        for j in length(a)-1:-1:2
+            h_envs[j-1] = h_envs[j]*a[j]*b[j]*c[j]*d[j]
+        end
+    else
+        h_envs[1] = a[1]*b[1]*c[1]*d[1]
+        for j in 2:length(a)-1
+            h_envs[j] = h_envs[j-1]*a[j]*b[j]*c[j]*d[j]
+        end
     end
 end
 
-function get_all_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_4b_envs::Array{ITensor}=Array{ITensor}(undef, size(peps,1)-1, 2, size(peps, 2)-1))
+function get_all_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_4b_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps,1)-1, size(peps, 2)-1), all_4b_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps,1)-1, size(peps, 2)-1))
     for i in 1:size(peps,1)-1
-        get_4b_envs!(peps, env_top, env_down, S, i, @view all_4b_envs[i,:,:])
+        view_r = @view all_4b_envs_r[i,:]
+        view_l = @view all_4b_envs_l[i,:]
+        get_4b_envs!(peps, env_top, env_down, S, i, view_r, view_l)
     end
-    return all_4b_envs
+    return all_4b_envs_r, all_4b_envs_l
 end
 
-function get_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs=Matrix{ITensor}(undef, 2,size(peps, 2)-1))
-    get_4b_envs!(peps, env_top, env_down,S,i,fourb_envs)
+function get_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs_r=Matrix{ITensor}(undef, size(peps, 2)-1), fourb_envs_l=Matrix{ITensor}(undef, size(peps, 2)-1))
+    get_4b_envs!(peps, env_top, env_down,S,i,fourb_envs_r, fourb_envs_l)
     return fourb_envs
 end
 
-function get_4b_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs)
+function get_4b_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs_r, fourb_envs_l)
     peps_i = get_projected(peps, S, i, :)  
     peps_j = get_projected(peps, S, i+1, :)
 
     if i == 1
-        contract_recursiv!(fourb_envs, peps_i, peps_j, c=env_down[end-1].env)
+        contract_recursiv!(fourb_envs_r, peps_i, peps_j, c=env_down[end-1].env)
+        contract_recursiv!(fourb_envs_l, peps_i, peps_j, c=env_down[end-1].env, right_to_left=false)
     elseif i == size(peps, 1)-1
-        contract_recursiv!(fourb_envs, env_top[end-1].env, peps_i, c=peps_j)
+        contract_recursiv!(fourb_envs_r, env_top[end-1].env, peps_i, c=peps_j)
+        contract_recursiv!(fourb_envs_l, env_top[end-1].env, peps_i, c=peps_j, right_to_left=false)
     else
-        contract_recursiv!(fourb_envs, env_top[i-1].env, peps_i, c=peps_j, d=env_down[end-i].env)
+        contract_recursiv!(fourb_envs_r, env_top[i-1].env, peps_i, c=peps_j, d=env_down[end-i].env)
+        contract_recursiv!(fourb_envs_l, env_top[i-1].env, peps_i, c=peps_j, d=env_down[end-i].env, right_to_left=false)
     end
 end

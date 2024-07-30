@@ -210,11 +210,11 @@ end
 ITensors.siteinds(peps::PEPS) = [siteind(peps, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
 
 # returns the exact inner product of 2 peps (only used for testing purposes)
-function inner_peps(psi::PEPS, psi2::PEPS) # TODO: Remove or fix this funciton
+function inner_peps(psi::PEPS, psi2::PEPS)
     x = 1
     for i in 1:size(psi)[1]
         for j in 1:size(psi)[2]
-            x *= psi[i,j]*psi2[i,j]*delta(inds(psi[i,j], "phys_$(j)_$(i)"), inds(psi2[i,j], "phys_$(j)_$(i)"))
+            x *= psi[i,j]*psi2[i,j]*delta(siteind(psi,i,j), siteind(psi2,i,j))
         end
     end
     return x[1]
