@@ -7,10 +7,7 @@ mutable struct PEPS
     double_contract_dim::Integer
     function PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim, shift=true)
         peps = new(tensors, nothing, bond_dim, sample_dim, contract_dim, double_contract_dim)
-        if shift
-            shift!(peps)
-        end
-        return peps
+        return shift!(peps, shift)
     end
 end
 
@@ -26,7 +23,7 @@ function Base.getproperty(x::PEPS, y::Symbol)
         if double_layer_envs === nothing
             double_layer_envs = generate_double_layer_envs(x)
             setfield!(x, :double_layer_envs, double_layer_envs)
-            @info "Double layer environments generated automatically"
+            @warn "PEPS: Double layer environments generated automatically"
         end
         return double_layer_envs
         
@@ -55,15 +52,35 @@ end
 function Base.length(peps::PEPS)
     x = 0
     for ten in peps.tensors
-        x += prod(size(ten))
+        x += length(ITensors.tensor(ten))
     end
     return x
 end
 
-function shift!(peps::PEPS)
-    for peps_i in peps.tensors
-        shift = std(peps_i.tensor.storage)
-        peps_i .+= 2*shift 
+function tensor_std(peps::PEPS)
+    mean_, mean_2 = 0, 0
+    l = 0
+    for ten in peps.tensors
+        mean_ += sum(ten.tensor.storage)
+        mean_2 += sum(x->x^2, ten.tensor.storage)
+        l += length(ITensors.tensor(ten))
+    end
+    mean_ /= l
+    mean_2 /= l
+    return sqrt(mean_2 - mean_^2)
+end
+
+function shift!(peps::PEPS, shift::Bool) 
+    if shift
+        return shift!(peps, 2 * tensor_std(peps) / peps.bond_dim)
+    else
+        return peps
+    end
+end
+
+function shift!(peps::PEPS, shift::Number)
+    for ten in peps.tensors
+        ten .+= shift 
     end
     return peps
 end
