@@ -2,20 +2,19 @@
 function rename_indices!(ket, indices_outer, changing_inds)
     for i in 1:length(indices_outer)
         indices_outer[i] = Index(dim(changing_inds[i]), "Ket_$(i)")
-        ket[i] = ket[i]*delta(changing_inds[i], indices_outer[i])
-        # TODO: Use the subsinds function defined in tensor_ops.jl instead. Or alternative use the prime() function from ITensors.jl
-        # ket[i] = subsinds(ket[i], changing_inds[i], indices_outer[i])
+        
+        ket[i] = subsinds(ket[i], changing_inds[i], indices_outer[i])
     end  
 end
 
 # renames all inner indices in a MPO/MPS
 function rename_indices!(ket)
     for i in 1:length(ket)-1
-        new_ind = Index(maxlinkdim(ket), "Ket_inner_$(i)")
-        old_ind = commoninds(ket[i], ket[i+1])
+        old_ind = commoninds(ket[i], ket[i+1])[1]
+        new_ind = Index(dim(old_ind), "Ket_inner_$(i)")
 
-        ket[i] = ket[i]*delta(new_ind, old_ind)
-        ket[i+1] = ket[i+1]*delta(new_ind, old_ind)
+        ket[i] = subsinds(ket[i], old_ind, new_ind)
+        ket[i+1] = subsinds(ket[i+1], old_ind, new_ind)
     end
 end
 
@@ -29,7 +28,7 @@ function generate_double_layer_env_row(peps_row, peps_row_above, contract_dim)
      
     rename_indices!(ket)
     com_inds = commoninds.(peps_row, peps_row_above)
-    rename_indices!(ket, indices_outer, com_inds)
+    rename_indices!(ket, indices_outer, vcat(com_inds...))
 
     E_mpo = contract(bra,ket,maxdim=contract_dim)
     
@@ -45,13 +44,13 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
     ket = copy(MPO(peps_row))
     
     com_inds = commoninds.(peps_row, peps_row_above)
-    rename_indices!(ket, indices_outer, com_inds)
+    rename_indices!(ket, indices_outer, vcat(com_inds...))
     for i in 1:length(peps_row)
         C[1,i] = combiner(indices_outer[i], com_inds[i], tags="up")
     end
 
     com_inds = commoninds.(peps_row, peps_row_below)
-    rename_indices!(ket, indices_outer, com_inds)
+    rename_indices!(ket, indices_outer, vcat(com_inds...))
     for i in 1:length(peps_row)
         C[2,i] = combiner_tar(indices_outer[i], com_inds[i]; target_ind=reduce(vcat, inds(peps_double_env.env[i], "up")), tags="down")
     end
@@ -95,7 +94,7 @@ function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
     rename_indices!(ket)
     
     if row != size(peps, 1)
-        rename_indices!(ket, indices_outer, commoninds.(peps[row, :], peps[row+1, :]))
+        rename_indices!(ket, indices_outer, vcat(commoninds.(peps[row, :], peps[row+1, :])...))
     end
     return conj(bra), ket
 end
@@ -157,15 +156,21 @@ end
 
 # samples from ρ_r and updates pc
 function sample_ρr(ρ_r)
-    # TODO: Generalize this to more than 2 states
-    p0 = abs(ρ_r[1,1])
-    p1 = abs(ρ_r[2,2])
-   
-    @assert imag(ρ_r[1,1]) < 1e-6
-    if rand() < p0/(p0+p1) 
-        return 0, p0/(p0+p1)
-    else
-        return 1, p1/(p0+p1)
+    numstates = size(ρ_r, 1) 
+    p = Array{Real}(undef, numstates)
+    for i in 1:numstates
+        @assert imag(ρ_r[i,i]) < 1e-6
+        p[i] = abs(ρ_r[i,i])
+    end
+
+    r = rand()
+    shift = 0
+    for i in 1:numstates
+        if r <= (p[i]+shift)/sum(p) 
+            return i-1, p[i]/sum(p)
+        else
+            shift += p[i]
+        end
     end
 end
 
