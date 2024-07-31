@@ -93,7 +93,6 @@ function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_w
             Ok = @view Oks[:, j, i]
             _, Eks[j, i], logψs[j, i], samples[j, i], logpcs[j, i] = Ok_and_Ek(peps, ham_op; Ok, kwargs...)
         end
-
     end
     Eks = reshape(Eks, :)
     Oks = reshape(Oks, size(Oks, 1), :)

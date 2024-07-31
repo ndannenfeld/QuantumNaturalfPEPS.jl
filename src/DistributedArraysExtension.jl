@@ -1,15 +1,14 @@
 """
 Fetches a distributed slice of a distributed array
 """
-function fetch_distributedslice(d::DArray, i1, i2)
-    rs = [remotecall(d->d.localpart[i1:i2, :], w, d) for w in d.pids]
-    
-    M = Matrix{eltype(d)}(undef, i2-i1+1, size(d, 2))
-    for (r, idx, pid) in zip(rs, d.indices, d.pids)
+function fetch_distributedslice(d::DArray, i1, i2; M=Matrix{eltype(d)}(undef, i2-i1+1, size(d, 2)))
+    rs = Vector{MPIFuture}(undef, length(d.pids))
+
+    for (i, (idx, w)) in enumerate(zip(d.indices, d.pids))
         dest = @view M[:, idx[2]]
-        Distributed.Serialization.register_deserialization_array!(pid, dest)
-        fetch(r)
+        rs[i] = remotecall_mpi!(dest, d->d.localpart[i1:i2, :], w, d)
     end
+    wait.(rs)
     return M
 end
 
@@ -25,13 +24,13 @@ end
 Calculates d' * d where d is a distributed array
 """
 function self_mul_transpose(d::DArray)
-    rs = Future[]
+    rs = Vector{MPIFuture}(undef, length(d.pids))
     i1 = 1
     nr_k = size(d, 1)
     nr_k_i = nr_k ÷ length(d.pids)
-    for w in d.pids
+    for (i, w) in enumerate(d.pids)
         i2 = i1 + nr_k_i -1
-        push!(rs, Distributed.remotecall(fetch_and_multiply, w, d, i1, i2))
+        rs[i] = Distributed.remotecall(fetch_and_multiply, w, d, i1, i2)
         i1 = i2 + 1
     end
 
@@ -41,5 +40,3 @@ function self_mul_transpose(d::DArray)
     end
     return sum_
 end
-
-getFuture(x) = remotecall(()-> x, myid())

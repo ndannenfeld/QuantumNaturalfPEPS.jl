@@ -6,6 +6,7 @@ using Random
 using LogExpFunctions
 
 using Distributed
+using MPI
 
 using ITensors
 
