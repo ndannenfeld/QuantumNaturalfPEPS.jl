@@ -2,11 +2,18 @@ mutable struct PEPS
     tensors::Matrix{ITensor}
     double_layer_envs
     bond_dim::Integer
+    
     sample_dim::Integer
+    sample_cutoff::Real
     contract_dim::Integer
+    contract_cutoff::Real
     double_contract_dim::Integer
-    function PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim, shift=true)
-        peps = new(tensors, nothing, bond_dim, sample_dim, contract_dim, double_contract_dim)
+    double_contract_cutoff::Real
+
+    function PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim,
+                                                               sample_cutoff=1e-13, contract_cutoff=1e-13, double_contract_cutoff=1e-13,
+                                                               shift=true)
+        peps = new(tensors, nothing, bond_dim, sample_dim, sample_cutoff, contract_dim, contract_cutoff, double_contract_dim, double_contract_cutoff)
         return shift!(peps, shift)
     end
 end
