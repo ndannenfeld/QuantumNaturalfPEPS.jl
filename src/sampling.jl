@@ -171,7 +171,7 @@ function sample_ρr(ρ_r)
         if r <= (p[i]+cumsum_)/Z 
             return i-1, p[i]/Z
         else
-            shift += p[i]
+            cumsum_ += p[i]
         end
     end
 end
