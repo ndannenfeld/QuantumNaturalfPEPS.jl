@@ -178,7 +178,7 @@ end
 
 # after the sampling of the current site, it is fixed and its contraction with the aleady sampled sites is stored in sigma
 function update_sigma(peps, sigma, S, i, row, norm_factor)
-    s = sigma* get_projector(S, siteind(peps, row, i))
+    s = sigma* get_projector(S, siteind(peps, row, i))*get_projector(S, inds(sigma, "ket_phys")[1])#ITensor([(S+1)%2, S], inds(sigma, "ket_phys"))
     return (s) / norm_factor
 end
 
