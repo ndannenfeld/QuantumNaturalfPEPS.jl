@@ -158,16 +158,18 @@ end
 function sample_ρr(ρ_r)
     numstates = size(ρ_r, 1) 
     p = Array{Real}(undef, numstates)
+    Z = 0
     for i in 1:numstates
         @assert imag(ρ_r[i,i]) < 1e-6
         p[i] = abs(ρ_r[i,i])
+        Z += p[i]
     end
 
     r = rand()
-    shift = 0
+    cumsum_ = 0
     for i in 1:numstates
-        if r <= (p[i]+shift)/sum(p) 
-            return i-1, p[i]/sum(p)
+        if r <= (p[i]+cumsum_)/Z 
+            return i-1, p[i]/Z
         else
             shift += p[i]
         end
