@@ -4,21 +4,21 @@ struct MPIFuture
     f::Future
     data::Any
 end
-function wait(f::MPIFuture)
+function Base.wait(f::MPIFuture)
     wait(f.f)
     MPI.Wait(f.req)
     return nothing
 end
 
-function fetch(f::MPIFuture)
+function Base.fetch(f::MPIFuture)
     wait(f)
     return f.data
 end
 
 
 function run_and_send(func, tag, dest, args...; kwargs...)
-    a = func(args...; kwargs...)
-    sreq = MPI.Isend(a, MPI.COMM_WORLD; tag, dest=dest - 1)
+    out = func(args...; kwargs...)
+    MPI.Isend(out, MPI.COMM_WORLD; tag, dest=dest - 1)
     return nothing
 end
 

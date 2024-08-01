@@ -24,7 +24,7 @@ end
 Calculates d' * d where d is a distributed array
 """
 function self_mul_transpose(d::DArray)
-    rs = Vector{MPIFuture}(undef, length(d.pids))
+    rs = Vector{Future}(undef, length(d.pids))
     i1 = 1
     nr_k = size(d, 1)
     nr_k_i = nr_k ÷ length(d.pids)
