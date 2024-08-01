@@ -20,7 +20,7 @@ end
 
 # calculates a double layer environment row by contracting a peps_row with itself along the physical indices
 # also combines the outgoing indices of the double layer
-function generate_double_layer_env_row(peps_row, peps_row_above, contract_dim)
+function generate_double_layer_env_row(peps_row, peps_row_above, maxdim; cutoff=1e-13)
     indices_outer = Array{Index}(undef, length(peps_row))
     
     bra = conj(MPO(peps_row))
@@ -30,13 +30,13 @@ function generate_double_layer_env_row(peps_row, peps_row_above, contract_dim)
     com_inds = commoninds.(peps_row, peps_row_above)
     rename_indices!(ket, indices_outer, vcat(com_inds...))
 
-    E_mpo = contract(bra,ket,maxdim=contract_dim)
+    E_mpo = contract(bra, ket; maxdim, cutoff)
     
     E_mps = MPS((E_mpo.*combiner.(indices_outer, com_inds, tags="up")).data)
     return Environment(E_mps; normalize=true)
 end
 
-function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below, peps_double_env, contract_dim)
+function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below, peps_double_env, maxdim; cutoff=1e-13)
     C = Array{ITensor}(undef, 2, length(peps_row))
     indices_outer = Array{Index}(undef, length(peps_row))
 
@@ -62,7 +62,7 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
     E_mpo = E_mpo.*C[1,:]
     E_mpo = E_mpo.*C[2,:]
 
-    E_mps = apply(E_mpo, peps_double_env.env, maxdim=contract_dim)
+    E_mps = apply(E_mpo, peps_double_env.env; maxdim, cutoff)
 
     return Environment(E_mps, peps_double_env.f; normalize=true)
 end
@@ -75,9 +75,9 @@ end
 function generate_double_layer_envs(peps::PEPS)
     double_layer_envs = Vector{Environment}(undef, size(peps, 1) - 1)
     # for every row we calculate the double layer environment
-    double_layer_envs[end] = generate_double_layer_env_row(peps[size(peps, 1), :], peps[size(peps, 1)-1, :], peps.double_contract_dim)
+    double_layer_envs[end] = generate_double_layer_env_row(peps[size(peps, 1), :], peps[size(peps, 1)-1, :], peps.double_contract_dim; cutoff=peps.double_contract_cutoff)
     for i in size(peps, 1)-1:-1:2
-        double_layer_envs[i-1] = generate_double_layer_env_row(peps[i, :], peps[i-1, :], peps[i+1, :], double_layer_envs[i], peps.double_contract_dim)
+        double_layer_envs[i-1] = generate_double_layer_env_row(peps[i, :], peps[i-1, :], peps[i+1, :], double_layer_envs[i], peps.double_contract_dim; cutoff=peps.double_contract_cutoff)
     end
     return double_layer_envs
 end
@@ -87,7 +87,7 @@ function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
     bra = MPO(peps[row, :])
 
     if row != 1   
-        bra = contract(bra, env_top[row-1].env, maxdim=peps.sample_dim)
+        bra = contract(bra, env_top[row-1].env; maxdim=peps.sample_dim, cutoff=peps.sample_cutoff)
     end
 
     ket = copy(bra)
@@ -158,16 +158,18 @@ end
 function sample_ρr(ρ_r)
     numstates = size(ρ_r, 1) 
     p = Array{Real}(undef, numstates)
+    Z = 0
     for i in 1:numstates
         @assert imag(ρ_r[i,i]) < 1e-6
         p[i] = abs(ρ_r[i,i])
+        Z += p[i]
     end
 
     r = rand()
-    shift = 0
+    cumsum_ = 0
     for i in 1:numstates
-        if r <= (p[i]+shift)/sum(p) 
-            return i-1, p[i]/sum(p)
+        if r <= (p[i]+cumsum_)/Z 
+            return i-1, p[i]/Z
         else
             shift += p[i]
         end
