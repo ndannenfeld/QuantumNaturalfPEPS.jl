@@ -62,7 +62,7 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
         con = get_projected(peps, (S.+1).%2, x[i], y[i])*con
         if y[1] != y[2]
             #con = peps[x[i],y[(i%2)+1]]*ITensor([(S[x[i],y[(i%2)+1]]+1)%2, S[x[i],y[(i%2)+1]]], siteind(peps,x[i],y[(i%2)+1]))*con
-            con = get_projected(peps, (S), x[i], y[(i%2)+1])#*con
+            con = get_projected(peps, (S), x[i], y[(i%2)+1])*con
         end
     end
     if minimum(y) != 1
@@ -162,7 +162,8 @@ function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environme
             fourb_envs_r, fourb_envs_l = get_all_4b_envs(peps, env_top, env_down, sample)
         end
         for key in fourBody
-            Ek_i, f = get_4body_term(peps, env_top, env_down, sample, key, fourb_envs_r[key[1][1][1], :], fourb_envs_l[key[1][1][1], :])
+            upperrow = minimum([key[1][1][1], key[2][1][1]])
+            Ek_i, f = get_4body_term(peps, env_top, env_down, sample, key, fourb_envs_r[upperrow, :], fourb_envs_l[upperrow, :])
             Ek += Ek_i * exp(f - logψ)*terms[key]
         end
     end
