@@ -17,6 +17,12 @@ function Test_logψ(peps::PEPS, S)
     return logψ, logψex
 end
 
+function Test_Ek(peps::PEPS, ham::OpSum; it=1)
+    hilbert = siteinds(peps)
+    ham_op = TensorOperatorSum(ham, hilbert)
+    return Test_Ek(peps::PEPS, ham_op; it)
+end
+
 function Test_Ek(peps::PEPS, ham_op; it=1)
     E = Array{Float64}(undef, it)
     Enum = Array{Float64}(undef, it)

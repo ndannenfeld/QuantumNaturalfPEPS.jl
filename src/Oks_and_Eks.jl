@@ -86,7 +86,7 @@ function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_w
     samples = Matrix{Any}(undef, k, nr_threads)
     Eks = Matrix{eltype_}(undef, k, nr_threads)
     logψs = Matrix{Complex{eltype_real}}(undef, k, nr_threads)
-    logpcs = Matrix{eltype_real}(undef,  k, nr_threads)
+    logpcs = Matrix{eltype_real}(undef, k, nr_threads)
     
     Threads.@threads for i in 1:nr_threads
         for j in 1:k
@@ -106,7 +106,7 @@ function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_w
         weights = logpcs
     end
 
-    return Eks, Oks, logψs, samples, weights
+    return transpose(Oks), Eks, logψs, samples, weights
 end
 
 #### Multiprocessing
@@ -144,7 +144,8 @@ function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_
     logpcs = Vector{eltype_real}(undef, sample_nr_eff)
     
     if Oks === nothing
-        Oks = Matrix{eltype_}(undef, nr_parameters, sample_nr_eff)
+        #Oks = Matrix{eltype_}(undef, nr_parameters, sample_nr_eff)
+        Oks = Matrix{eltype_}(undef, sample_nr_eff, nr_parameters)
     end
 
     Threads.@threads for (i, out_i) in collect(enumerate(out))
@@ -152,7 +153,7 @@ function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_
         i1 = k_eff * (i - 1) + 1
         i2 = k_eff * i
         
-        Eks[i1:i2], Oks[:, i1:i2], logψs[i1:i2], samples[i1:i2], logpcs[i1:i2] = fetch(out_i)
+        Oks[i1:i2, :], Eks[i1:i2], logψs[i1:i2], samples[i1:i2], logpcs[i1:i2] = fetch(out_i)
     end
     
     if importance_weights
@@ -161,5 +162,5 @@ function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_
         weights = logpcs
     end
     
-    return Eks, Oks, logψs, samples, weights
+    return Oks, Eks, logψs, samples, weights
 end
