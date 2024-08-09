@@ -48,8 +48,8 @@ function flatten(peps::PEPS) # Flattens the tensors into a vector
         for j in 1:size(peps, 2)
             shift = prod(dim.(inds(peps[i,j])))
             x = @view θ[pos:pos+shift-1]
-            permute_reshape_and_copy!(x, peps[i,j], (siteind(peps,i,j), QuantumNaturalfPEPS.linkinds(peps,i,j)...))
-            #permute_reshape_and_copy!(x, peps[i,j], (QuantumNaturalfPEPS.linkinds(peps,i,j)..., siteind(peps,i,j)))
+            permute_reshape_and_copy!(x, peps[i, j], (siteind(peps, i, j), linkinds(peps, i, j)...))
+            #permute_reshape_and_copy!(x, peps[i, j], (linkinds(peps,i,j)..., siteind(peps,i,j)))
             pos = pos+shift
         end
     end
