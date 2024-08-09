@@ -223,7 +223,8 @@ function ITensors.siteind(peps::PEPS, i, j)
     elseif Ly == 1
         return uniqueind(peps[i,j], peps[i%Lx+1, j], peps[(i-2+Lx)%Lx+1, j])
     end
-    si = uniqueind(peps[i,j], peps[i%Lx+1, j], peps[(i-2+Lx)%Lx+1, j], peps[i,j%Ly + 1], peps[i, (j-2+Lx)%Ly+1])
+    si = uniqueind(peps[i,j], peps[i%Lx+1, j], peps[(i-2+Lx)%Lx+1, j], peps[i,j%Ly + 1], peps[i, (j-2+Ly)%Ly+1])
+    @assert si !== nothing
     return si
 end
 
