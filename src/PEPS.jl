@@ -227,9 +227,7 @@ function ITensors.siteind(peps::PEPS, i, j)
     return si
 end
 
-function linkinds(peps::PEPS, i,j)
-    return filter!(!=(siteind(peps,i,j)), collect(inds(peps[i,j])))
-end
+ITensors.linkinds(peps::PEPS, i, j) = filter!(!=(siteind(peps, i, j)), collect(inds(peps[i ,j])))
 
 ITensors.siteinds(peps::PEPS) = [siteind(peps, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
 
