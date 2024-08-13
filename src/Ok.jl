@@ -40,7 +40,7 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
                 if S[i,j] == spin
                     # Write in Gradient
                     x = @view Ok[pos+spin:loc_dim:pos+loc_dim*shift-1]
-                    permute_reshape_and_copy!(x, Ok_Tensor, linkinds(peps,i,j))
+                    permute_reshape_and_copy!(x, Ok_Tensor, linkinds(peps, i, j))
                 else
                     # Fill with zeros instead
                     Ok[pos+spin:loc_dim:pos+loc_dim*shift-1] .= 0

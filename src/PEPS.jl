@@ -12,7 +12,7 @@ mutable struct PEPS
 
     function PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim,
                                                                sample_cutoff=1e-13, contract_cutoff=1e-13, double_contract_cutoff=1e-13,
-                                                               shift=true)
+                                                               shift=false)
         peps = new(tensors, nothing, bond_dim, sample_dim, sample_cutoff, contract_dim, contract_cutoff, double_contract_dim, double_contract_cutoff)
         return shift!(peps, shift)
     end
@@ -119,10 +119,10 @@ end
 
 PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
 
-function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, kwargs...) where {S<:Number}
+function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, shift=true, kwargs...) where {S<:Number}
     
     tensors = isoPEPS_tensor_init(S, hilbert, bond_dim; tensor_init)
-    return PEPS(tensors, bond_dim; kwargs...)
+    return PEPS(tensors, bond_dim; shift, kwargs...)
 end
 
 # alternative initializer that initializes the peps as an isopeps
