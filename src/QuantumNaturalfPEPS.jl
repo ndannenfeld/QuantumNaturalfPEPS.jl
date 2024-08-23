@@ -24,6 +24,9 @@ include("Ek.jl")
 include("Ok_and_Ek.jl")
 include("Oks_and_Eks.jl")
 include("SerializationPatch.jl")
+
+include("GeometricEntanglement.jl")
+include("GeometricEntanglementDoubleLayer.jl")
 include("Test.jl")
 
 
