@@ -28,9 +28,9 @@ function Base.getproperty(x::PEPS, y::Symbol)
     if y === :double_layer_envs
         double_layer_envs = getfield(x, :double_layer_envs)
         if double_layer_envs === nothing
+            @warn "PEPS: Double layer environments generated automatically"
             double_layer_envs = generate_double_layer_envs(x)
             setfield!(x, :double_layer_envs, double_layer_envs)
-            @warn "PEPS: Double layer environments generated automatically"
         end
         return double_layer_envs
         
@@ -197,18 +197,17 @@ end
 
 function init_Links(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1)
     Lx, Ly = size(hilbert)
-
     # initializing bond indices
     h_links = Array{Index{Int64}}(undef, Lx, Ly-1)
     v_links = Array{Index{Int64}}(undef, Lx-1, Ly)
     for i in 1:Lx
         for j in 1:Ly-1
-            h_links[i,j] = Index(bond_dim, "h_link, $(i)$(j) -> $(i)$(j+1)")
+            h_links[i,j] = Index(bond_dim, "h_link, $(i);$(j) -> $(i);$(j+1)")
         end
     end
     for i in 1:Lx-1
         for j in 1:Ly
-            v_links[i,j] = Index(bond_dim, "v_link, $(i)$(j) -> $(i+1)$(j)")
+            v_links[i,j] = Index(bond_dim, "v_link, $(i);$(j) -> $(i+1);$(j)")
         end
     end
     return h_links, v_links
