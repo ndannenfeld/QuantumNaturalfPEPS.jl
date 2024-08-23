@@ -9,11 +9,12 @@ mutable struct PEPS
     contract_cutoff::Real
     double_contract_dim::Integer
     double_contract_cutoff::Real
+    show_warning::Bool
 
     function PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim,
                                                                sample_cutoff=1e-13, contract_cutoff=1e-13, double_contract_cutoff=1e-13,
-                                                               shift=false)
-        peps = new(tensors, nothing, bond_dim, sample_dim, sample_cutoff, contract_dim, contract_cutoff, double_contract_dim, double_contract_cutoff)
+                                                               shift=false, show_warning=false)
+        peps = new(tensors, nothing, bond_dim, sample_dim, sample_cutoff, contract_dim, contract_cutoff, double_contract_dim, double_contract_cutoff, show_warning)
         return shift!(peps, shift)
     end
 end
@@ -261,6 +262,10 @@ function get_projected(peps::PEPS, S, i, j)
 end
 
 get_projected(peps::PEPS, S::Matrix{Int64}) = [get_projected(peps, S, i, j)  for i in 1:size(S, 1), j in 1:size(S, 2)]
+
+function get_flipped(peps::PEPS, S, i, j)
+    return get_projected(peps, (S.+1).%2, i, j)
+end
 
 function contract_peps_exact(peps)
     x = 1

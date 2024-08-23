@@ -43,7 +43,7 @@ end
 
 function get_logψ_func(peps)
     function logψ_func(sample)
-        return QuantumNaturalfPEPS.logψ_exact(peps, sample.-1)
+        return (QuantumNaturalfPEPS.logψ_exact(peps, sample.-1))
     end
     return logψ_func
 end

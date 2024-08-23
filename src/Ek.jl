@@ -10,7 +10,7 @@ function sort_dict(terms; vertical=true)
     for key in keys(terms)
         if length(key) == 1     # one spin flip is considered a horizontal
             insert(hor, key)
-        else
+        elseif length(key) == 2
             if key[1][1][1] == key[2][1][1]  #same row
                 insert(hor, key)
             elseif key[1][1][2] == key[2][1][2]  #same column
@@ -22,6 +22,8 @@ function sort_dict(terms; vertical=true)
             else
                 insert(four, key)
             end
+        else
+            insert(four, key)
         end
     end
     return hor,vert,four
@@ -49,29 +51,30 @@ end
 
 
 
-# a function that computes the contraction of the PEPS with one/two flipped spin(s) at a position specified in key
+# a function that computes the contraction of the PEPS with flipped spins at a position specified in key
 function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, key, fourb_envs_r, fourb_envs_l)
     con = 1
     f = 0
     
-    x = [key[1][1][1], key[2][1][1]]
-    y = [key[1][1][2], key[2][1][2]]
+    x = map(t -> t[1][1], key)
+    y = map(t -> t[1][2], key)
     
-    for i in 1:2
-        #con = peps[x[i],y[i]]*ITensor([S[x[i],y[i]], (S[x[i],y[i]]+1)%2], siteind(peps,x[i],y[i]))*con
-        con = get_projected(peps, (S.+1).%2, x[i], y[i])*con
-        if y[1] != y[2]
-            #con = peps[x[i],y[(i%2)+1]]*ITensor([(S[x[i],y[(i%2)+1]]+1)%2, S[x[i],y[(i%2)+1]]], siteind(peps,x[i],y[(i%2)+1]))*con
-            con = get_projected(peps, (S), x[i], y[(i%2)+1])*con
-        end
+    for i in 1:length(x)
+        con = get_flipped(peps, S, x[i], y[i])*con
     end
+
+    unflipped_spins = setdiff([(xi, yi) for xi in unique(x), yi in unique(y)], zip(x, y))
+    for comb in unflipped_spins
+        con = get_projected(peps, S, comb[1], comb[2])*con
+    end
+
     if minimum(y) != 1
         con = con*fourb_envs_l[minimum(y)-1]
     end
         
     if minimum(x) != 1
         con = con*env_top[minimum(x)-1].env[minimum(y)]
-        if y[1] != y[2]
+        if minimum(y) != maximum(y)
             con = con*env_top[minimum(x)-1].env[maximum(y)]
         end
         f += env_top[minimum(x)-1].f
@@ -79,7 +82,7 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
         
     if maximum(x) != size(peps, 1)
         con = con*env_down[end-maximum(x)+1].env[minimum(y)]
-        if y[1] != y[2]
+        if minimum(y) != maximum(y)
             con = con*env_down[end-maximum(x)+1].env[maximum(y)]
         end
         f += env_down[end-maximum(x)+1].f
@@ -162,9 +165,10 @@ function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environme
             fourb_envs_r, fourb_envs_l = get_all_4b_envs(peps, env_top, env_down, sample)
         end
         for key in fourBody
-            upperrow = minimum([key[1][1][1], key[2][1][1]])
+            row_values = map(t -> t[1][1], key)
+            upperrow = minimum(row_values)
             Ek_i, f = get_4body_term(peps, env_top, env_down, sample, key, fourb_envs_r[upperrow, :], fourb_envs_l[upperrow, :])
-            Ek += Ek_i * exp(f - logψ)*terms[key]
+            Ek += (Ek_i) * exp(f - logψ)*terms[key]
         end
     end
     

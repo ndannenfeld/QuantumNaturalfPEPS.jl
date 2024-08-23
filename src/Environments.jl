@@ -54,8 +54,14 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environ
         i_prime = size(S,1)+1-i 
         if overwrite
             env_top[i] = generate_env_row(peps_projected[i,:], peps.contract_dim; env_row_above=env_top[i-1], alg, cutoff=peps.contract_cutoff)
+            if maxlinkdim(env_top[i].env) == peps.contract_dim && peps.show_warning
+                @warn "horizontal environments at maximal bond dimension"
+            end
         end
         env_down[i] = generate_env_row(peps_projected[i_prime,:], peps.contract_dim; env_row_above=env_down[i-1], alg, cutoff=peps.contract_cutoff)
+        if maxlinkdim(env_down[i].env) == peps.contract_dim && peps.show_warning
+            @warn "horizontal environments at maximal bond dimension"
+        end
     end
     
     # once we calculated all environments we calculate <ψ|S> using the environments
