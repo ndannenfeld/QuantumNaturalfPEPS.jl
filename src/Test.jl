@@ -6,7 +6,7 @@ function Test_Ok(peps::PEPS, S::Matrix{Int64}, direction; env_top=nothing, env_d
         h_envs_r, h_envs_l = get_all_horizontal_envs(peps, env_top, env_down, S) 
     end
 
-    Ok = get_Ok(peps, env_top, env_down, S, h_envs_r, h_envs_l, logψ)'*direction
+    Ok = transpose(get_Ok(peps, env_top, env_down, S, h_envs_r, h_envs_l, logψ))*direction
     Oknum = numerical_Ok(peps, S, direction, logψ; dt=dt)
     return Ok, Oknum
 end
