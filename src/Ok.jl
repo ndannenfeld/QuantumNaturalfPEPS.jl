@@ -26,7 +26,10 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
                 Ok_Tensor *= h_envs_l[i,j-1]
             end
             g = exp(f - logψ)
-            g = convert_if_real(g)
+            # if the tensor is real, we only want the real part of the gradient
+            if isreal(Ok_Tensor) 
+                g = real(g)
+            end
             Ok_Tensor *= g
             @assert eltype(Ok_Tensor) === eltype(peps) "The gradient is $(eltype(Ok_Tensor)) but the PEPS is $(eltype(peps))"
 
