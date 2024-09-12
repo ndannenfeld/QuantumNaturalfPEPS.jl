@@ -277,3 +277,46 @@ function contract_peps_exact(peps)
 
     return x[1]
 end
+
+function write_Tensor!(peps, tensor, i, j)
+    @assert eltype(tensor) == eltype(peps) "The type of the PEPS and the tensor must be the same type $(eltype(tensor)) != $(eltype(peps))"
+    inds = Vector{Index}()    
+    if i != 1
+        push!(inds, commoninds(peps[i,j], peps[i-1,j])...)
+    end
+    if j != size(peps,2)
+        push!(inds, commoninds(peps[i,j], peps[i,j+1])...)
+    end
+    if i != size(peps,1)
+        push!(inds, commoninds(peps[i,j], peps[i+1,j])...)
+    end
+    if j != 1
+        push!(inds, commoninds(peps[i,j], peps[i,j-1])...)
+    end
+    push!(inds, siteind(peps, i, j))
+    peps[i,j] = ITensor(tensor, inds)
+end
+
+# Writes Array of Tensors into fPEPS with a pattern e.g.
+# pattern = [1 2 3
+#            3 4 5]
+# fPEPS has the following tensors in its bulk: 1 2 3 1 2 3 ...
+#                                              3 4 5 3 4 5 ...
+#                                              1 2 3 1 2 3 ... 
+function iPEPS_to_fPEPS(iPEPS, Lx, Ly, pattern)
+    T = eltype(iPEPS[1])
+    samplecut = marginalcut = bdim = size(iPEPS[1], 1)
+    contract_dim = 3*bdim
+    hilbert = siteinds("S=1/2", Lx, Ly)
+
+    peps = PEPS(T, hilbert; bond_dim=bdim, sample_dim=samplecut, double_contract_dim=marginalcut, contract_dim, shift=false, show_warning=true)
+    for i in 2:Lx-1
+        for j in 2:Ly-1
+            x = pattern[(i-2)%(size(pattern,1))+1, (j-2)%(size(pattern,2))+1]
+            write_Tensor!(peps, iPEPS[x], i, j)
+        end
+    end
+
+    peps.double_layer_envs = nothing
+    return peps
+end 
