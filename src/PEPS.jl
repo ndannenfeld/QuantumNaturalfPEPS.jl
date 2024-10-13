@@ -280,21 +280,27 @@ end
 
 function write_Tensor!(peps, tensor, i, j)
     @assert eltype(tensor) == eltype(peps) "The type of the PEPS and the tensor must be the same type $(eltype(tensor)) != $(eltype(peps))"
-    inds = Vector{Index}()    
+    indices = Vector{Index}()    
     if i != 1
-        push!(inds, commoninds(peps[i,j], peps[i-1,j])...)
+        push!(indices, commoninds(peps[i,j], peps[i-1,j])...)
     end
     if j != size(peps,2)
-        push!(inds, commoninds(peps[i,j], peps[i,j+1])...)
+        push!(indices, commoninds(peps[i,j], peps[i,j+1])...)
     end
     if i != size(peps,1)
-        push!(inds, commoninds(peps[i,j], peps[i+1,j])...)
+        push!(indices, commoninds(peps[i,j], peps[i+1,j])...)
     end
     if j != 1
-        push!(inds, commoninds(peps[i,j], peps[i,j-1])...)
+        push!(indices, commoninds(peps[i,j], peps[i,j-1])...)
     end
-    push!(inds, siteind(peps, i, j))
-    peps[i,j] = ITensor(tensor, inds)
+    push!(indices, siteind(peps, i, j))
+    
+    if typeof(tensor)==ITensor
+        replaceind!.(Ref(tensor), inds(tensor), indices)
+    else
+        tensor = ITensor(tensor, indices)
+    end
+    peps[i,j] = tensor
 end
 
 # Writes Array of Tensors into fPEPS with a pattern e.g.
@@ -303,20 +309,93 @@ end
 # fPEPS has the following tensors in its bulk: 1 2 3 1 2 3 ...
 #                                              3 4 5 3 4 5 ...
 #                                              1 2 3 1 2 3 ... 
-function iPEPS_to_fPEPS(iPEPS, Lx, Ly, pattern)
+function iPEPS_to_fPEPS(iPEPS, Lx, Ly, pattern; vectors=:random)
     T = eltype(iPEPS[1])
     samplecut = marginalcut = bdim = size(iPEPS[1], 1)
     contract_dim = 3*bdim
     hilbert = siteinds("S=1/2", Lx, Ly)
 
     peps = PEPS(T, hilbert; bond_dim=bdim, sample_dim=samplecut, double_contract_dim=marginalcut, contract_dim, shift=false, show_warning=true)
-    for i in 2:Lx-1
-        for j in 2:Ly-1
+    
+    return iPEPS_to_fPEPS!(peps::PEPS, iPEPS, Lx, Ly, pattern; vectors=:random)
+end
+
+function iPEPS_to_fPEPS!(peps::PEPS, iPEPS, Lx, Ly, pattern; vectors=:random)
+    peps.double_layer_envs = nothing
+    iPEPS_to_fPEPS_bulk!(peps, iPEPS, pattern)
+    if vectors != :none
+        iPEPS_to_fPEPS_boundary!(peps, iPEPS, pattern; vectors)
+    end
+    return peps
+end
+
+function iPEPS_to_fPEPS_bulk!(peps, iPEPS, pattern)
+    for i in 2:size(peps,1)-1
+        for j in 2:size(peps,2)-1
             x = pattern[(i-2)%(size(pattern,1))+1, (j-2)%(size(pattern,2))+1]
             write_Tensor!(peps, iPEPS[x], i, j)
         end
     end
+end
 
-    peps.double_layer_envs = nothing
-    return peps
-end 
+# vectors can be either: Array{Vector, 2*size(peps,1) + 2*size(peps,2) + 4} -> will be used subsequently to contract boundary Tensors
+#                        Array{Vector, 4} -> will be used subsequently to contract boundary Tensors. A different Vector will be used for 
+#                                            different contract-direction. 1: left, 2: down, 3: right, 4: up
+#                        :random          -> generates random Vectors for contraction
+#                        :four            -> generates 4 random Vectors. A different Vector will be used for different contract-direction.
+#                        :ones            -> generates 4 onevalued vectors
+#                        :none            -> border peps stay random
+function iPEPS_to_fPEPS_boundary!(peps, iPEPS, pattern; vectors=:random)
+    if !isa(vectors, AbstractArray)
+        vectors = generate_vectors(peps, iPEPS, vectors)
+    end
+
+    isFour = length(vectors)==4
+
+    indices = Index.(size(iPEPS[1]))
+    for j in [1,size(peps,2)]
+        for i in 1:size(peps,1)
+            x = pattern[(i-2+size(pattern,1))%size(pattern,1) + 1, (j-2+size(pattern,2))%size(pattern,2) + 1]
+            j == 1 ? y = 1 : y = 3
+            if isFour
+                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(vectors[y], indices[y])
+            else
+                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(popfirst!(vectors), indices[y])
+            end
+            if i == 1 || i == size(peps,1)
+                i == 1 ? y = 4 : y = 2
+                if isFour
+                    ipeps_ten *= ITensor(vectors[y], indices[y])
+                else
+                    ipeps_ten *= ITensor(popfirst!(vectors), indices[y])
+                end
+            end
+            peps[i,j] = write_Tensor!(peps, ipeps_ten, i, j)
+        end
+    end
+
+    for j in 2:size(peps,2)-1
+        for i in [1, size(peps,1)]
+            x = pattern[(i-2+size(pattern,1))%size(pattern,1) + 1, (j-2+size(pattern,2))%size(pattern,2) + 1]
+            i == 1 ? y = 4 : y = 2
+            if isFour
+                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(vectors[y], indices[y])
+            else
+                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(popfirst!(vectors), indices[y])
+            end
+            peps[i,j] = write_Tensor!(peps, ipeps_ten, i, j)
+        end
+    end
+end
+
+function generate_vectors(peps, iPEPS, vector_type)
+    if vector_type == :random
+        return [rand(peps.bond_dim) for i in 1:2*size(peps,1) + 2*size(peps,2) + 4]
+    elseif vector_type == :four
+        return [rand(peps.bond_dim) for i in 1:4]
+    elseif vector_type == :ones
+        return [ones(peps.bond_dim) for i in 1:4]
+    else
+        throw(ArgumentError("Unrecognized vector_type: $vector_type"))
+    end
+end
