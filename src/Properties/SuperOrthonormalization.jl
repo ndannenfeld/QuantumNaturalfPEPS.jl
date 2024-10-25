@@ -51,7 +51,7 @@ function split_merge(o1, o2)
     return apply(o1, x_), apply(o2, y_), S
 end
 
-function split_merge!(peps::QuantumNaturalfPEPS.PEPS; split_merge_=split_merge)
+function split_merge!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; split_merge_=split_merge)
     Sx = Array{Float64}(undef, size(peps, 1)-1, size(peps, 2), peps.bond_dim)
     Sy = Array{Float64}(undef, size(peps, 1), size(peps, 2)-1, peps.bond_dim)
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
@@ -67,7 +67,7 @@ function split_merge!(peps::QuantumNaturalfPEPS.PEPS; split_merge_=split_merge)
     return Sx, Sy
 end
 
-function super_orthonormalization!(peps; k=1000, error=1e-4, verbose=false, kwargs...)   
+function super_orthonormalization!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; k=1000, error=1e-4, verbose=false, kwargs...)   
     Sx, Sy = split_merge!(peps; kwargs...)
     for i in 1:k
         Sx2, Sy2 = split_merge!(peps; kwargs...)
@@ -86,4 +86,4 @@ function super_orthonormalization!(peps; k=1000, error=1e-4, verbose=false, kwar
     return Sx, Sy, peps, res
 end
 
-super_orthonormalization(peps; kwargs...) = super_orthonormalization!(deepcopy(peps); kwargs...)
+super_orthonormalization(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; kwargs...) = super_orthonormalization!(deepcopy(peps); kwargs...)
