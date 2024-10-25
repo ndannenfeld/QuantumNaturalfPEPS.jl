@@ -120,8 +120,12 @@ end
 
 PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
 
+
+"""
+    PEPS(S, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, shift=true, kwargs...) where {S<:Number}
+    tensor_init: function that initializes the tensors, default=random_unitary other options: randomITensor
+"""
 function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, shift=true, kwargs...) where {S<:Number}
-    
     tensors = isoPEPS_tensor_init(S, hilbert, bond_dim; tensor_init)
     return PEPS(tensors, bond_dim; shift, kwargs...)
 end
