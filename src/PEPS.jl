@@ -317,7 +317,8 @@ function write_Tensor!(peps, tensor, i, j)
     else
         tensor = ITensor(tensor, indices)
     end
-    peps[i,j] = tensor
+    perm = NDTensors.getperm(inds(peps[i,j]), indices)
+    peps[i,j] = ITensor(permutedims(tensor.tensor, perm))
 end
 
 # Writes Array of Tensors into fPEPS with a pattern e.g.
