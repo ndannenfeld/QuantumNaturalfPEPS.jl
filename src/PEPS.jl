@@ -135,7 +135,7 @@ function PEPS(::Type{S}, type, Lx::Int64, Ly::Int64; kwargs...) where {S<:Number
     return PEPS(S, hilbert; kwargs...)
 end
 
-PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
+PEPS(hilbert::Matrix{Index{Int64}}; kwargs...) = PEPS(Float64, hilbert; kwargs...)
 
 
 """
