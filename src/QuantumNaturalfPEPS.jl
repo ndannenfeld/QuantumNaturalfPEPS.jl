@@ -8,6 +8,7 @@ using LogExpFunctions
 using Distributed
 using MPI
 
+using LinearAlgebra
 using ITensors
 
 using QuantumNaturalGradient: TensorOperatorSum
