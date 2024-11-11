@@ -6,12 +6,15 @@ function reduce_dim(l1, l2)
     return ITensor(m, l1, l2)
 end
 
-function split_merge_slow(o1, o2)
+function split_merge_slow(o1, o2; normalize_spectrum=true)
     comm = commonind(o1, o2)
     l1 = uniqueinds(o1, comm)
     l2 = uniqueinds(o2, comm)
     
     U, S, V = svd(o1 * o2, l1)
+    if normalize_spectrum
+        S ./= norm(S)
+    end
     o1 = U * (sqrt.(S) * reduce_dim(S.tensor.inds[2], comm))
     o2 = V * (sqrt.(S) * reduce_dim(S.tensor.inds[1], comm))
     return o1, o2, S.tensor.storage[1:dim(comm)]
@@ -22,35 +25,32 @@ isnan2(x) = sum(isnan.(x)) > 0
 function split_merge(o1, o2; cutoff=1e-6, directional=false, normalize_spectrum=true)
     # https://arxiv.org/pdf/1808.00680
     comm = commonind(o1, o2)
+    M1 = o1 * conj(prime(o1, comm))
+    M2 = o2 * conj(prime(o2, comm))
     
-    M1 = o1 * prime(o1, comm)
-    M2 = o2 * prime(o2, comm)
-    
-    M1_, M2_ =  reshape(M1.tensor.storage, dim(comm),dim(comm)), reshape(M2.tensor.storage, dim(comm),dim(comm))
+    M1_ =  reshape(M1.tensor.storage, dim(comm),dim(comm))
     D1, u1 = eigen(M1_)
-
-    
+    #@show D1
+    M2_ = reshape(M2.tensor.storage, dim(comm),dim(comm))
     D2, u2 = eigen(M2_)
     #@show D1
     #@show D2
     D1_sqrt, D2_sqrt = sqrt.(abs.(D1)), sqrt.(abs.(D2))
     # Stable inversion by only inverting the non-zero eigenvalues
-    D1_inv = inv_cutoff_func.(D1_sqrt; cutoff)
-    D2_inv = inv_cutoff_func.(D2_sqrt; cutoff)
+    
     lambda_1 = reshape(D1_sqrt, :, 1) .* u1'
     lambda_2 = u2 .* reshape(D2_sqrt, 1, :)
 
     lambda_ = lambda_1 * lambda_2
     w1, S, w2 = svd(lambda_)
-    if norm(S) < 1e-3
-        @show norm(o1) ,norm(o2)
-    end
     if normalize_spectrum
         S ./= norm(S)
     end
+    D1_inv = inv_cutoff_func.(D1_sqrt; cutoff)
     x_inv = u1 .* reshape(D1_inv, 1, :)
     x_inv = x_inv * w1
 
+    D2_inv = inv_cutoff_func.(D2_sqrt; cutoff)
     y_inv = w2' .* reshape(D2_inv, 1, :)
     y_inv = y_inv * u2'
     
@@ -68,6 +68,8 @@ function split_merge(o1, o2; cutoff=1e-6, directional=false, normalize_spectrum=
     y_ = ITensor(y_, comm, comm')
     o1n = apply(o1, x_)
     o2n = apply(o2, y_)
+
+    #@show norm(o1n * o2n - o1 * o2)
     return o1n, o2n, S
 end
 
