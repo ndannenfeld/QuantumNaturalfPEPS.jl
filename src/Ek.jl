@@ -1,14 +1,17 @@
 
-# function that sorts the dictionary of flipped spin terms into the categories horizontal,vertical and 4body terms. Also sorts so that the row-number gets bigger
-# vertical=false sorts all vertical terms into the 4body array
-function sort_dict(terms; vertical=true)
+# function that sorts the dictionary of flipped spin Ek_terms into the categories horizontal,vertical and 4body Ek_terms. Also sorts so that the row-number gets bigger
+# vertical=false sorts all vertical Ek_terms into the 4body array
+function sort_dict(Ek_terms; vertical=true)
     hor = Vector{Any}()
     vert = Vector{Any}()
     four = Vector{Any}()
+    other = Vector{Any}()
     
     # loop through every term
-    for key in keys(terms)
-        if length(key) == 1     # one spin flip is considered a horizontal
+    for key in keys(Ek_terms)
+        if key == Any[]
+            # do nothing
+        elseif length(key) == 1     # one spin flip is considered a horizontal
             insert(hor, key)
         elseif length(key) == 2
             if key[1][1][1] == key[2][1][1]  #same row
@@ -22,11 +25,13 @@ function sort_dict(terms; vertical=true)
             else
                 insert(four, key)
             end
-        else
+        else # TODO: check here wheter it is a 4-body term
             insert(four, key)
+        # else
+        # insert(other, key)
         end
     end
-    return hor,vert,four
+    return hor, vert, four, other
 end
    
 # inserts the element x into the array arr at the desired position
@@ -91,16 +96,16 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
     if maximum(y) != size(peps, 2)
         con = con*fourb_envs_r[maximum(y)]
     end
-        
-    return con[1], f
+    logψ_flipped = log(con[]) + f
+    return logψ_flipped
 end
 
-# same as get_4body_term but for horizontal terms
+# same as get_4body_term but for horizontal Ek_terms
 function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, key, h_envs_r, h_envs_l)
     f = 0
     
     x = key[1][1][1]
-    y = [key[1][1][2]]
+    y = [key[1][1][2]] # TODO: waht is x, y?
     
     #flip = peps[x,y[1]]*ITensor([S[x,y[1]], (S[x,y[1]]+1)%2], siteind(peps,x,y[1]))
     flip = get_projected(peps, (S.+1).%2, x, y[1])
@@ -132,47 +137,76 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
     if maximum(y) != size(peps, 2)
         flip = flip*h_envs_r[maximum(y)]
     end
+
+    logψ_flipped = log(contract(flip)[]) + f
        
-    return contract(flip)[1], f
+    return logψ_flipped
 end
 
 # computes the local energy <sample|H|ψ>/<sample|ψ>
-function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}; fourb_envs_r=nothing, fourb_envs_l=nothing)
-    terms = QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, sample .+ 1; get_flip_sites=true)
+function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}; fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing)
     
-    Ek = 0
+    if logψ_flipped === nothing
+        logψ_flipped = Dict{Any, Number}()
+    end
       
     # deals with the term with no flipped spin
-    if haskey(terms, Any[])
-        Ek += terms[Any[]]
-        delete!(terms, Any[])
+    if haskey(Ek_terms, Any[])
+        logψ_flipped[Any[]] = logψ
     end
     
     # sorts the dictionary into the different categories
-    horizontal, vertical, fourBody = sort_dict(terms, vertical=false)
+    horizontal, vertical, fourBody, other = sort_dict(Ek_terms, vertical=false)
 
     # loop through every horizontal components
-    for key in horizontal
-
+    for key in horizontal 
         # calculate the Energy contribution of the specific term and add it to the total Ek
-        Ek_i, f = get_term(peps, env_top, env_down, sample, key, h_envs_r[key[1][1][1], :], h_envs_l[key[1][1][1], :])
-        Ek += (Ek_i)*exp(f-logψ)*terms[key]  
+        if !haskey(logψ_flipped, key)
+            logψ_flipped[key] = get_term(peps, env_top, env_down, sample, key, h_envs_r[key[1][1][1], :], h_envs_l[key[1][1][1], :])
+        end
     end
     
-    # same for non-horizontal terms
+    # same for non-horizontal Ek_terms
     if !isempty(fourBody)
         if fourb_envs_r === nothing || fourb_envs_l === nothing 
             fourb_envs_r, fourb_envs_l = get_all_4b_envs(peps, env_top, env_down, sample)
         end
         for key in fourBody
-            row_values = map(t -> t[1][1], key)
-            upperrow = minimum(row_values)
-            Ek_i, f = get_4body_term(peps, env_top, env_down, sample, key, fourb_envs_r[upperrow, :], fourb_envs_l[upperrow, :])
-            Ek += (Ek_i) * exp(f - logψ)*terms[key]
+            if !haskey(logψ_flipped, key)
+                row_values = map(t -> t[1][1], key)
+                upperrow = minimum(row_values)
+                logψ_flipped[key] = get_4body_term(peps, env_top, env_down, sample, key, fourb_envs_r[upperrow, :], fourb_envs_l[upperrow, :])
+            end
         end
     end
-    
-    Ek = convert_if_real(Ek)
 
-    return Ek
+    if !isempty(other)
+        @warn "Only nearest and next nearest neighbour interactions are efficiently supported. Note that if the opertor is in he computational basis, any interaction length is possible."
+        # TODO: fix the pseudocode below
+        #for key in other
+        #    if !haskey(logψ_flipped, key)
+        #       sample_flipped = sample
+        #       logψ_flipped[key] = get_logpsi(sample_flipped)
+        #    end
+        #end
+    end
+
+    return logψ_flipped
+end
+
+function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}; fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing)
+    Ek_terms = QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, sample .+ 1; get_flip_sites=true)
+    
+    logψ_flipped = get_logψ_flipped(peps, Ek_terms, env_top, env_down, sample, logψ, h_envs_r, h_envs_l; fourb_envs_r, fourb_envs_l, logψ_flipped)
+    
+    Ek = 0
+    for key in keys(Ek_terms)
+        if key === Any[]
+            Ek += Ek_terms[key]
+        else
+            Ek += Ek_terms[key] * exp(logψ_flipped[key] - logψ)
+        end
+    end
+
+    return convert_if_real(Ek)
 end
