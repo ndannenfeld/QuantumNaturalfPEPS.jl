@@ -96,7 +96,13 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
     if maximum(y) != size(peps, 2)
         con = con*fourb_envs_r[maximum(y)]
     end
-    logψ_flipped = log(con[]) + f
+
+    c = con[]
+    if c < 0
+        c = complex(c)
+    end
+    logψ_flipped = log(c) + f
+    
     return logψ_flipped
 end
 
@@ -137,8 +143,11 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
     if maximum(y) != size(peps, 2)
         flip = flip*h_envs_r[maximum(y)]
     end
-
-    logψ_flipped = log(contract(flip)[]) + f
+    c = contract(flip)[]
+    if c < 0
+        c = complex(c)
+    end
+    logψ_flipped = log(c) + f
        
     return logψ_flipped
 end
@@ -193,6 +202,20 @@ function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, e
 
     return logψ_flipped
 end
+
+function get_Ek(peps::PEPS, ham::OpSum, sample; kwargs...)
+    hilbert = siteinds(peps)
+    ham_op = TensorOperatorSum(ham, hilbert)
+    return get_Ek(peps, ham_op, sample; kwargs...)
+end
+
+function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, sample; kwargs...)
+    # get the environment tensors
+    logψ, env_top, env_down = get_logψ_and_envs(peps, sample) # compute the environments of the peps according to that sample
+    h_envs_r, h_envs_l = get_all_horizontal_envs(peps, env_top, env_down, sample) # computes the horizontal environments of the already sampled peps
+    return get_Ek(peps, ham_op, env_top, env_down, sample, logψ, h_envs_r, h_envs_l; kwargs...)
+end
+
 
 function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}; fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing)
     Ek_terms = QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, sample .+ 1; get_flip_sites=true)
