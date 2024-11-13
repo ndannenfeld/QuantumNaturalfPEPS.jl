@@ -9,7 +9,7 @@ function sort_dict(Ek_terms; vertical=true)
     
     # loop through every term
     for key in keys(Ek_terms)
-        if key == Any[]
+        if key == ()
             # do nothing
         elseif length(key) == 1     # one spin flip is considered a horizontal
             insert(hor, key)
@@ -160,8 +160,8 @@ function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, e
     end
       
     # deals with the term with no flipped spin
-    if haskey(Ek_terms, Any[])
-        logψ_flipped[Any[]] = logψ
+    if haskey(Ek_terms, ())
+        logψ_flipped[()] = logψ
     end
     
     # sorts the dictionary into the different categories
@@ -224,7 +224,7 @@ function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environme
     
     Ek = 0
     for key in keys(Ek_terms)
-        if key === Any[]
+        if key == ()
             Ek += Ek_terms[key]
         else
             Ek += Ek_terms[key] * exp(logψ_flipped[key] - logψ)
