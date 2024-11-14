@@ -264,25 +264,24 @@ function inner_peps(psi::PEPS, psi2::PEPS)
     return x[1]
 end
 
-function get_projector(i, index; shift=1)
-    @assert index.space >= i+shift "The index space is too small for the given shift"
+function get_projector(i::Int, index; shift=1)
+    @assert index.space >= i+shift "The dimension is $(index.space) but the requested index is $(i+shift)"
     return onehot(index=>i+shift)
 end
 
-function get_projected(peps::PEPS, S, i, j)
+function get_projected(peps::PEPS, S::Matrix{Int64}, i, j)
     if i === Colon() && j === Colon()
-        return [get_projected(peps, S, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
+        return [get_projected(peps, S[i, j], i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
     elseif i === Colon()
-        return [get_projected(peps, S, i, j) for i in 1:size(peps, 1)]
+        return [get_projected(peps, S[i, j], i, j) for i in 1:size(peps, 1)]
     elseif j === Colon()
-        return [get_projected(peps, S, i, j) for j in 1:size(peps, 2)]
+        return [get_projected(peps, S[i, j], i, j) for j in 1:size(peps, 2)]
     end
-
-    index = siteind(peps, i, j)
-    return peps[i,j] * get_projector(S[i, j], index)
+    return get_projected(peps, S[i, j], i, j)
 end
 
-get_projected(peps::PEPS, S::Matrix{Int64}) = [get_projected(peps, S, i, j)  for i in 1:size(S, 1), j in 1:size(S, 2)]
+get_projected(peps::PEPS, Sij::Int64, i::Int64, j::Int64) = peps[i,j] * get_projector(Sij, siteind(peps, i, j))
+get_projected(peps::PEPS, S::Matrix{Int64}) = get_projected(peps, S, :, :)
 
 function get_flipped(peps::PEPS, S, i, j)
     return get_projected(peps, (S.+1).%2, i, j)
