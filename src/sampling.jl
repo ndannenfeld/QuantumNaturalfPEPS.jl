@@ -156,24 +156,30 @@ end
 
 # samples from ρ_r and updates pc
 function sample_ρr(ρ_r)
-    numstates = size(ρ_r, 1) 
-    p = Array{Real}(undef, numstates)
-    Z = 0
-    for i in 1:numstates
-        @assert imag(ρ_r[i,i]) < 1e-6
+    k = size(ρ_r, 1) 
+    T = real(eltype(ρ_r))
+    p = Vector{T}(undef, k)
+    for i in 1:k
         p[i] = abs(ρ_r[i,i])
-        Z += p[i]
+        @assert imag(ρ_r[i,i]) / (p[i] + 1e-10) < 1e-11
     end
+    i = sample_p(p, normalize=true)
+    return i-1, p[i]
+end
 
+function sample_p(probs::Vector{T}; normalize=true) where T<:Real
+    if normalize
+        probs ./= sum(probs)
+    end
     r = rand()
-    cumsum_ = 0
-    for i in 1:numstates
-        if r <= (p[i]+cumsum_)/Z 
-            return i-1, p[i]/Z
-        else
-            cumsum_ += p[i]
+    psum = 0
+    for (i, p) in enumerate(probs)
+        psum += p
+        if psum > r
+            return i
         end
     end
+    error("probs is not normalized sum(probs)=$(sum(probs))")
 end
 
 # after the sampling of the current site, it is fixed and its contraction with the aleady sampled sites is stored in sigma

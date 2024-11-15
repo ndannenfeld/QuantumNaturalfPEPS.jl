@@ -11,10 +11,12 @@ mutable struct PEPS
     double_contract_cutoff::Real
     show_warning::Bool
 
+    mask::Matrix
+
     function PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim,
                                                                sample_cutoff=1e-13, contract_cutoff=1e-13, double_contract_cutoff=1e-13,
-                                                               shift=false, show_warning=false)
-        peps = new(tensors, nothing, bond_dim, sample_dim, sample_cutoff, contract_dim, contract_cutoff, double_contract_dim, double_contract_cutoff, show_warning)
+                                                               shift=false, show_warning=false, mask=ones(size(tensors)))
+        peps = new(tensors, nothing, bond_dim, sample_dim, sample_cutoff, contract_dim, contract_cutoff, double_contract_dim, double_contract_cutoff, show_warning, mask)
         return shift!(peps, shift)
     end
 end
@@ -40,27 +42,40 @@ function Base.getproperty(x::PEPS, y::Symbol)
     end
 end
 
-Base.convert(::Type{Vector}, peps::PEPS) = flatten(peps)
-function flatten(peps::PEPS) # Flattens the tensors into a vector
+Base.convert(::Type{Vector}, peps::PEPS; mask=peps.mask) = flatten(peps; mask)
+function flatten(peps::PEPS; mask=peps.mask) # Flattens the tensors into a vector
     type = eltype(peps)
-    θ = Vector{type}(undef, length(peps))
+    θ = Vector{type}(undef, length(peps; mask))
     pos = 1
     for i in 1:size(peps, 1)
         for j in 1:size(peps, 2)
-            shift = prod(dim.(inds(peps[i,j])))
-            x = @view θ[pos:pos+shift-1]
-            permute_reshape_and_copy!(x, peps[i, j], (siteind(peps, i, j), linkinds(peps, i, j)...))
-            #permute_reshape_and_copy!(x, peps[i, j], (linkinds(peps,i,j)..., siteind(peps,i,j)))
-            pos = pos+shift
+            if mask[i,j]!=0
+                shift = prod(dim.(inds(peps[i,j])))
+                x = @view θ[pos:pos+shift-1]
+                permute_reshape_and_copy!(x, peps[i, j], (siteind(peps, i, j), linkinds(peps, i, j)...))
+                pos = pos+shift
+            end
         end
     end
     return θ
 end
 
-function Base.length(peps::PEPS)
+#function Base.length(peps::PEPS)
+#    x = 0
+#    for ten in peps.tensors
+#        x += length(ITensors.tensor(ten))
+#    end
+#    return x
+#end
+
+function Base.length(peps::PEPS; mask=peps.mask)
     x = 0
-    for ten in peps.tensors
-        x += length(ITensors.tensor(ten))
+    for i in 1:size(peps,1)
+        for j in 1:size(peps,2)
+            if mask[i,j]!=0
+                x += length(ITensors.tensor(peps.tensors[i,j]))
+            end
+        end
     end
     return x
 end
@@ -93,14 +108,16 @@ function shift!(peps::PEPS, shift::Number)
     return peps
 end
 
-function write!(peps::PEPS, θ::Vector{T}; reset_double_layer=true) where T# Writes the vector θ into the tensors.
+function write!(peps::PEPS, θ::Vector{T}; reset_double_layer=true, mask=peps.mask) where T# Writes the vector θ into the tensors.
     @assert eltype(peps) == T "The type of the PEPS and the vector θ must be the same type $T != $(eltype(peps))"
     pos = 1
     for i in 1:size(peps, 1)
         for j in 1:size(peps, 2)
-            shift = prod(dim.(inds(peps[i,j])))
-            peps[i, j][:] = reshape(θ[pos:(pos+shift-1)], dim.(inds(peps[i,j])))
-            pos += shift
+            if mask[i,j]!=0
+                shift = prod(dim.(inds(peps[i,j])))
+                peps[i, j][:] = reshape(θ[pos:(pos+shift-1)], dim.(inds(peps[i,j])))
+                pos += shift
+            end
         end
     end
     if reset_double_layer
@@ -118,10 +135,14 @@ function PEPS(::Type{S}, type, Lx::Int64, Ly::Int64; kwargs...) where {S<:Number
     return PEPS(S, hilbert; kwargs...)
 end
 
-PEPS(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, kwargs...) = PEPS(Float64, hilbert, bond_dim; kwargs...)
+PEPS(hilbert::Matrix{Index{Int64}}; kwargs...) = PEPS(Float64, hilbert; kwargs...)
 
+
+"""
+    PEPS(S, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, shift=true, kwargs...) where {S<:Number}
+    tensor_init: function that initializes the tensors, default=random_unitary other options: randomITensor
+"""
 function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, shift=true, kwargs...) where {S<:Number}
-    
     tensors = isoPEPS_tensor_init(S, hilbert, bond_dim; tensor_init)
     return PEPS(tensors, bond_dim; shift, kwargs...)
 end
@@ -243,25 +264,24 @@ function inner_peps(psi::PEPS, psi2::PEPS)
     return x[1]
 end
 
-function get_projector(i, index; shift=1)
-    @assert index.space >= i+shift "The index space is too small for the given shift"
+function get_projector(i::Int, index; shift=1)
+    @assert index.space >= i+shift "The dimension is $(index.space) but the requested index is $(i+shift)"
     return onehot(index=>i+shift)
 end
 
-function get_projected(peps::PEPS, S, i, j)
+function get_projected(peps::PEPS, S::Matrix{Int64}, i, j)
     if i === Colon() && j === Colon()
-        return [get_projected(peps, S, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
+        return [get_projected(peps, S[i, j], i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
     elseif i === Colon()
-        return [get_projected(peps, S, i, j) for i in 1:size(peps, 1)]
+        return [get_projected(peps, S[i, j], i, j) for i in 1:size(peps, 1)]
     elseif j === Colon()
-        return [get_projected(peps, S, i, j) for j in 1:size(peps, 2)]
+        return [get_projected(peps, S[i, j], i, j) for j in 1:size(peps, 2)]
     end
-
-    index = siteind(peps, i, j)
-    return peps[i,j] * get_projector(S[i, j], index)
+    return get_projected(peps, S[i, j], i, j)
 end
 
-get_projected(peps::PEPS, S::Matrix{Int64}) = [get_projected(peps, S, i, j)  for i in 1:size(S, 1), j in 1:size(S, 2)]
+get_projected(peps::PEPS, Sij::Int64, i::Int64, j::Int64) = peps[i,j] * get_projector(Sij, siteind(peps, i, j))
+get_projected(peps::PEPS, S::Matrix{Int64}) = get_projected(peps, S, :, :)
 
 function get_flipped(peps::PEPS, S, i, j)
     return get_projected(peps, (S.+1).%2, i, j)
@@ -276,4 +296,127 @@ function contract_peps_exact(peps)
     end
 
     return x[1]
+end
+
+function write_Tensor!(peps, tensor, i, j)
+    @assert eltype(tensor) == eltype(peps) "The type of the PEPS and the tensor must be the same type $(eltype(tensor)) != $(eltype(peps))"
+    indices = Vector{Index}()    
+    if j != 1
+        push!(indices, commoninds(peps[i,j], peps[i,j-1])...)
+    end
+    if i != size(peps,1)
+        push!(indices, commoninds(peps[i,j], peps[i+1,j])...)
+    end
+    if j != size(peps,2)
+        push!(indices, commoninds(peps[i,j], peps[i,j+1])...)
+    end
+    if i != 1
+        push!(indices, commoninds(peps[i,j], peps[i-1,j])...)
+    end
+    push!(indices, siteind(peps, i, j))
+    
+    if typeof(tensor)==ITensor
+        replaceind!.(Ref(tensor), inds(tensor), indices)
+    else
+        tensor = ITensor(tensor, indices)
+    end
+    perm = NDTensors.getperm(inds(peps[i,j]), indices)
+    peps[i,j] = ITensor(permutedims(tensor.tensor, perm))
+end
+
+# Writes Array of Tensors into fPEPS with a pattern e.g.
+# pattern = [1 2 3
+#            3 4 5]
+# fPEPS has the following tensors in its bulk: 1 2 3 1 2 3 ...
+#                                              3 4 5 3 4 5 ...
+#                                              1 2 3 1 2 3 ... 
+function iPEPS_to_fPEPS(iPEPS, Lx, Ly, pattern; vectors=:random)
+    T = eltype(iPEPS[1])
+    samplecut = marginalcut = bdim = size(iPEPS[1], 1)
+    contract_dim = 3*bdim
+    hilbert = siteinds("S=1/2", Lx, Ly)
+
+    peps = PEPS(T, hilbert; bond_dim=bdim, sample_dim=samplecut, double_contract_dim=marginalcut, contract_dim, shift=false, show_warning=true)
+    
+    return iPEPS_to_fPEPS!(peps::PEPS, iPEPS, Lx, Ly, pattern; vectors)
+end
+
+function iPEPS_to_fPEPS!(peps::PEPS, iPEPS, Lx, Ly, pattern; vectors=:random)
+    peps.double_layer_envs = nothing
+    iPEPS_to_fPEPS_bulk!(peps, iPEPS, pattern)
+    if vectors != :none
+        iPEPS_to_fPEPS_boundary!(peps, iPEPS, pattern; vectors)
+    end
+    return peps
+end
+
+function iPEPS_to_fPEPS_bulk!(peps, iPEPS, pattern)
+    for i in 2:size(peps,1)-1
+        for j in 2:size(peps,2)-1
+            x = pattern[(i-2)%(size(pattern,1))+1, (j-2)%(size(pattern,2))+1]
+            write_Tensor!(peps, iPEPS[x], i, j)
+        end
+    end
+end
+
+# vectors can be either: Array{Vector, 2*size(peps,1) + 2*size(peps,2) + 4} -> will be used subsequently to contract boundary Tensors
+#                        Array{Vector, 4} -> will be used subsequently to contract boundary Tensors. A different Vector will be used for 
+#                                            different contract-direction. 1: left, 2: down, 3: right, 4: up
+#                        :random          -> generates random Vectors for contraction
+#                        :four            -> generates 4 random Vectors. A different Vector will be used for different contract-directions.
+#                        :ones            -> generates 4 one-valued vectors
+#                        :none            -> border peps stay random
+function iPEPS_to_fPEPS_boundary!(peps, iPEPS, pattern; vectors=:random)
+    if !isa(vectors, AbstractArray)
+        vectors = generate_vectors(peps, iPEPS, vectors)
+    end
+
+    isFour = length(vectors)==4
+
+    indices = Index.(size(iPEPS[1]))
+    for j in [1,size(peps,2)]
+        for i in 1:size(peps,1)
+            x = pattern[(i-2+size(pattern,1))%size(pattern,1) + 1, (j-2+size(pattern,2))%size(pattern,2) + 1]
+            j == 1 ? y = 1 : y = 3
+            if isFour
+                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(vectors[y], indices[y])
+            else
+                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(popfirst!(vectors), indices[y])
+            end
+            if i == 1 || i == size(peps,1)
+                i == 1 ? y = 4 : y = 2
+                if isFour
+                    ipeps_ten *= ITensor(vectors[y], indices[y])
+                else
+                    ipeps_ten *= ITensor(popfirst!(vectors), indices[y])
+                end
+            end
+            peps[i,j] = write_Tensor!(peps, ipeps_ten, i, j)
+        end
+    end
+
+    for j in 2:size(peps,2)-1
+        for i in [1, size(peps,1)]
+            x = pattern[(i-2+size(pattern,1))%size(pattern,1) + 1, (j-2+size(pattern,2))%size(pattern,2) + 1]
+            i == 1 ? y = 4 : y = 2
+            if isFour
+                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(vectors[y], indices[y])
+            else
+                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(popfirst!(vectors), indices[y])
+            end
+            peps[i,j] = write_Tensor!(peps, ipeps_ten, i, j)
+        end
+    end
+end
+
+function generate_vectors(peps, iPEPS, vector_type)
+    if vector_type == :random
+        return [rand(peps.bond_dim) for i in 1:2*size(peps,1) + 2*size(peps,2) + 4]
+    elseif vector_type == :four
+        return [rand(peps.bond_dim) for i in 1:4]
+    elseif vector_type == :ones
+        return [ones(peps.bond_dim) for i in 1:4]
+    else
+        throw(ArgumentError("Unrecognized vector_type: $vector_type"))
+    end
 end

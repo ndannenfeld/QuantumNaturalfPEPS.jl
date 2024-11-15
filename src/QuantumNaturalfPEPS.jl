@@ -8,6 +8,7 @@ using LogExpFunctions
 using Distributed
 using MPI
 
+using LinearAlgebra
 using ITensors
 
 using QuantumNaturalGradient: TensorOperatorSum
@@ -23,10 +24,9 @@ include("Ok.jl")
 include("Ek.jl")
 include("Ok_and_Ek.jl")
 include("Oks_and_Eks.jl")
-include("SerializationPatch.jl")
 
-include("GeometricEntanglement.jl")
-include("GeometricEntanglementDoubleLayer.jl")
+include("Properties/Properties.jl")
+include("Distributed/Distributed.jl")
 include("Test.jl")
 
 

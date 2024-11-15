@@ -6,7 +6,7 @@ function Test_Ok(peps::PEPS, S::Matrix{Int64}, direction; env_top=nothing, env_d
         h_envs_r, h_envs_l = get_all_horizontal_envs(peps, env_top, env_down, S) 
     end
 
-    Ok = get_Ok(peps, env_top, env_down, S, h_envs_r, h_envs_l, logψ)'*direction
+    Ok = transpose(get_Ok(peps, env_top, env_down, S, h_envs_r, h_envs_l, logψ))*direction
     Oknum = numerical_Ok(peps, S, direction, logψ; dt=dt)
     return Ok, Oknum
 end
@@ -46,4 +46,27 @@ function get_logψ_func(peps)
         return (QuantumNaturalfPEPS.logψ_exact(peps, sample.-1))
     end
     return logψ_func
+end
+
+function get_Ek(peps::PEPS, ham::OpSum; it=100)
+    hilbert = siteinds(peps)
+    ham_op = TensorOperatorSum(ham, hilbert)
+    return get_Ek(peps::PEPS, ham_op; it)
+end
+
+function get_Ek(peps, ham_op; it=100)
+    E = Array{Float64}(undef, it)
+
+    update_double_layer_envs!(peps)
+
+    for i in 1:it
+        S, _ = get_sample(peps)
+        logψ, env_top, env_down = get_logψ_and_envs(peps, S)
+        h_envs_r, h_envs_l = get_all_horizontal_envs(peps, env_top, env_down, S) 
+        fourb_envs_r, fourb_envs_l = get_all_4b_envs(peps, env_top, env_down, S)
+
+        E[i] = get_Ek(peps, ham_op, env_top, env_down, S, logψ, h_envs_r, h_envs_l; fourb_envs_r, fourb_envs_l)
+    end
+
+    return E
 end

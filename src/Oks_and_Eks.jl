@@ -124,7 +124,8 @@ function generate_Oks_and_Eks_multiproc(peps::PEPS, ham_op::TensorOperatorSum; t
 end
 
 function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_weights=true, 
-                               n_threads=Distributed.remotecall_fetch(()->Threads.nthreads(), workers()[1]))
+                               n_threads=Distributed.remotecall_fetch(()->Threads.nthreads(), workers()[1]),
+                               kwargs...)
 
     nr_procs = length(workers())
     k = ceil(Int, sample_nr / nr_procs)
@@ -133,7 +134,7 @@ function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_
     sample_nr_eff = k_eff * nr_procs
     nr_parameters = length(peps)
     # TODO: Send ham_op only once through the network
-    out = [Distributed.remotecall(() -> Oks_and_Eks_threaded(peps, ham_op, k; importance_weights=false), w) for w in workers()]
+    out = [Distributed.remotecall(() -> Oks_and_Eks_threaded(peps, ham_op, k; importance_weights=false, kwargs...), w) for w in workers()]
     
     eltype_ = eltype(peps)
     eltype_real = real(eltype_)
