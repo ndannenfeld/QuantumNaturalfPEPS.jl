@@ -27,10 +27,12 @@ end
 function generate_Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), kwargs...)
     function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer; kwargs2...) where T
         if length(kwargs2) > 0
-            kwargs = merge(kwargs, kwargs2)
+            kwargs_new = Dict{Symbol,Any}() # Fix of bug in julias merge function
+            kwargs = merge(kwargs_new, kwargs, kwargs2)
         end
         write!(peps, Θ)
         @timeit timer "double_layer_envs" update_double_layer_envs!(peps) # update the double layer environments once for the peps 
+        
         return Oks_and_Eks_singlethread(peps, ham_op, sample_nr; timer=timer, kwargs...)
     end
     return Oks_and_Eks_

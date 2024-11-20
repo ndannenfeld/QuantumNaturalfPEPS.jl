@@ -111,8 +111,8 @@ end
 function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, flip_term, h_envs_r, h_envs_l)
     f = 0
     @assert length(flip_term) <= 2 " Only nearest and next nearest neighbour interactions are efficiently supported. Note that if the opertor is in he computational basis, any interaction length is possible."
-    ys = []
-    Sijs = []
+    ys = Int[]
+    Sijs = Int[]
     x = flip_term[1][1][1] # x cordinate of the first spin that was flipped
     for flip_term_i in flip_term
         (x_, y), Sij = flip_term_i
@@ -164,7 +164,7 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
 end
 
 # computes the local energy <sample|H|ψ>/<sample|ψ>
-function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}; fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing)
+function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}; fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing, timer=TimerOutput())
     
     if logψ_flipped === nothing
         logψ_flipped = Dict{Any, Number}()
@@ -179,7 +179,7 @@ function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, e
     horizontal, vertical, fourBody, other = sort_dict(Ek_terms, vertical=false)
 
     # loop through every horizontal components
-    for flip_term in horizontal 
+    @timeit timer "horizontal" for flip_term in horizontal 
         # calculate the Energy contribution of the specific term and add it to the total Ek
         if !haskey(logψ_flipped, flip_term)
             logψ_flipped[flip_term] = get_term(peps, env_top, env_down, sample, flip_term, h_envs_r[flip_term[1][1][1], :], h_envs_l[flip_term[1][1][1], :])
@@ -189,9 +189,9 @@ function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, e
     # same for non-horizontal Ek_terms
     if !isempty(fourBody)
         if fourb_envs_r === nothing || fourb_envs_l === nothing 
-            fourb_envs_r, fourb_envs_l = get_all_4b_envs(peps, env_top, env_down, sample)
+            @timeit timer "fourbody_envs" fourb_envs_r, fourb_envs_l = get_all_4b_envs(peps, env_top, env_down, sample)
         end
-        for flip_term in fourBody
+        @timeit timer "fourbody" for flip_term in fourBody
             if !haskey(logψ_flipped, flip_term)
                 row_values = map(t -> t[1][1], flip_term)
                 upperrow = minimum(row_values)
@@ -228,11 +228,11 @@ function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, sample; kwargs...)
 end
 
 
-function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}; fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing, Ek_terms=nothing)
+function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}; fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing, Ek_terms=nothing, kwargs...)
     if Ek_terms === nothing
         Ek_terms = QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, sample; get_flip_sites=true)
     end
-    logψ_flipped = get_logψ_flipped(peps, Ek_terms, env_top, env_down, sample, logψ, h_envs_r, h_envs_l; fourb_envs_r, fourb_envs_l, logψ_flipped)
+    logψ_flipped = get_logψ_flipped(peps, Ek_terms, env_top, env_down, sample, logψ, h_envs_r, h_envs_l; fourb_envs_r, fourb_envs_l, logψ_flipped, kwargs...)
     
     Ek = 0
     for flip_term in keys(Ek_terms)

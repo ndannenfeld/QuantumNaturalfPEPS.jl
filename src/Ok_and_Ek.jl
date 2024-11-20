@@ -1,7 +1,6 @@
 
 # Calculates the Energy and Gradient of a given peps and hamiltonian
 function Ok_and_Ek(peps, ham_op; timer=TimerOutput(), Ok=nothing, resample=false, correct_sampling_error=true, resample_energy=0, kwargs...)
-     
     S, logpc, env_top = @timeit timer "sampling" get_sample(peps) # draw a sample
     
     if resample
@@ -13,8 +12,8 @@ function Ok_and_Ek(peps, ham_op; timer=TimerOutput(), Ok=nothing, resample=false
     
     # initialize the flipped logψ dictionary, will be used to compute other observables or for the resampling
     logψ_flipped = Dict{Any, Number}() 
-    Ek_terms = QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, S; get_flip_sites=true)
-    E_loc = @timeit timer "energy" get_Ek(peps, ham_op, env_top, env_down, S, logψ, h_envs_r, h_envs_l; logψ_flipped, Ek_terms) # compute the local energy
+    Ek_terms = @timeit timer "precomp_sHψ_elems"  QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, S; get_flip_sites=true)
+    E_loc = @timeit timer "energy" get_Ek(peps, ham_op, env_top, env_down, S, logψ, h_envs_r, h_envs_l; logψ_flipped, Ek_terms, timer) # compute the local energy
     grad = @timeit timer "log_gradients" get_Ok(peps, env_top, env_down, S, h_envs_r, h_envs_l, logψ; Ok) # compute the gradient
 
     if resample # adjust logpc, this will introduce errors as this is only an approximation of the true logpc
