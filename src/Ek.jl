@@ -11,24 +11,25 @@ function sort_dict(Ek_terms; vertical=true)
     for flip_term in keys(Ek_terms)
         if flip_term == () # if no spin flip
             # do nothing
-        elseif length(flip_term) == 1     # one spin flip is considered a horizontal
-            insert(hor, flip_term)
-        elseif length(flip_term) == 2
-            if flip_term[1][1][1] == flip_term[2][1][1]  #same row
-                insert(hor, flip_term)
-            elseif flip_term[1][1][2] == flip_term[2][1][2]  #same column
-                if vertical
-                    insert(vert, flip_term)
-                else
-                    insert(four, flip_term)
-                end
-            else
-                insert(four, flip_term)
+        else 
+            xs = []
+            ys = []
+            for flip_term_i in flip_term
+                (x, y), Sij = flip_term_i
+                push!(xs, x)
+                push!(ys, y)
             end
-        else # TODO: check here wheter it is a 4-body term
-            insert(four, flip_term)
-        # else
-        # insert(other, flip_term)
+            if length(xs) == 1
+                insert(hor, flip_term)
+            elseif maximum(xs)-minimum(xs) == 0 && maximum(ys)-minimum(ys) <= 1
+                insert(hor, flip_term)
+            elseif maximum(xs)-minimum(xs) <= 1 && maximum(ys)-minimum(ys) == 0 && vertical
+                insert(vetr, flip_term)
+            elseif maximum(xs)-minimum(xs) <= 1 && maximum(ys)-minimum(ys) <=1
+                insert(four, flip_term)
+            else
+                insert(other, flip_term)
+            end
         end
     end
     return hor, vert, four, other
@@ -54,51 +55,71 @@ function insert(arr, x)
     push!(arr,x)
 end
 
-
-
 # a function that computes the contraction of the PEPS with flipped spins at a position specified in flip_term
 function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, flip_term, fourb_envs_r, fourb_envs_l)
-    # TODO: Fix the code so that it work for something else than physical dimension 2, take inspiration from the get_term function
-    con = 1
+    con_left = 1
+    con_right = 1
     f = 0
     
-    x = map(t -> t[1][1], flip_term)
-    y = map(t -> t[1][2], flip_term)
-    
-    for i in 1:length(x)
-        con = get_flipped(peps, S, x[i], y[i])*con
-    end
-
-    unflipped_spins = setdiff([(xi, yi) for xi in unique(x), yi in unique(y)], zip(x, y))
-    for comb in unflipped_spins
-        con = get_projected(peps, S, comb[1], comb[2])*con
-    end
-
-    if minimum(y) != 1
-        con = con*fourb_envs_l[minimum(y)-1]
-    end
-        
-    if minimum(x) != 1
-        con = con*env_top[minimum(x)-1].env[minimum(y)]
-        if minimum(y) != maximum(y)
-            con = con*env_top[minimum(x)-1].env[maximum(y)]
-        end
-        f += env_top[minimum(x)-1].f
-    end
-        
-    if maximum(x) != size(peps, 1)
-        con = con*env_down[end-maximum(x)+1].env[minimum(y)]
-        if minimum(y) != maximum(y)
-            con = con*env_down[end-maximum(x)+1].env[maximum(y)]
-        end
-        f += env_down[end-maximum(x)+1].f
+    xs = []
+    ys = []
+    Sijs = Dict{Any, Number}()
+    for flip_term_i in flip_term
+        (x, y), Sij = flip_term_i
+        push!(xs, x)
+        push!(ys, y)
+        Sijs[x,y] = Sij
     end
     
-    if maximum(y) != size(peps, 2)
-        con = con*fourb_envs_r[maximum(y)]
+    maxx = maximum(xs)
+    minx = minimum(xs)
+    maxy = maximum(ys)
+    miny = minimum(ys)
+
+    @assert maxx-minx <= 1 "Only adjacent rows/coloumns allowed in 4body_term"
+    @assert maxy-miny <= 1 "Only adjacent rows/coloumns allowed in 4body_term"
+
+    unflipped_spins = setdiff([(xi, yi) for xi in unique(xs), yi in unique(ys)], zip(xs, ys))
+    for us in unflipped_spins
+        x,y = us
+        push!(xs, x)
+        push!(ys, y)
+        Sijs[x,y] = S[x,y]
     end
 
-    c = con[]
+    if miny != 1
+        con_left = con_left*fourb_envs_l[miny-1]
+    end
+    if maxy != size(peps, 2)
+        con_right = con_right*fourb_envs_r[maxy]
+    end
+
+    if minx != 1
+        con_left = con_left*env_top[minx-1].env[miny]
+        if miny != maxy
+            con_right = con_right*env_top[minx-1].env[maxy]
+        end
+        f += env_top[minx-1].f
+    end
+
+    pairs = unique([(x, y) for x in (minx, maxx) for y in (miny, maxy)])
+    for p in pairs
+        if p[2] == miny
+            con_left = con_left*get_projected(peps, Sijs[p], p[1], p[2])
+        else
+            con_right = con_right*get_projected(peps, Sijs[p], p[1], p[2])
+        end
+    end
+
+    if maxx != size(peps, 1)
+        con_left = con_left*env_down[end-maxx+1].env[miny]
+        if miny != maxy
+            con_right = con_right*env_down[end-maxx+1].env[maxy]
+        end
+        f += env_down[end-maxx+1].f
+    end
+
+    c = (con_right*con_left)[]
     if c < 0
         c = complex(c)
     end
@@ -202,13 +223,16 @@ function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, e
 
     if !isempty(other)
         @warn "Only nearest and next nearest neighbour interactions are efficiently supported. Note that if the opertor is in he computational basis, any interaction length is possible."
-        # TODO: fix the pseudocode below
-        #for flip_term in other
-        #    if !haskey(logψ_flipped, flip_term)
-        #       sample_flipped = sample
-        #       logψ_flipped[flip_term] = get_logpsi(sample_flipped)
-        #    end
-        #end
+        for flip_term in other
+            if !haskey(logψ_flipped, flip_term)
+                sample_flipped = copy(sample)
+                for flip_term_i in flip_term
+                    (x, y), Sij = flip_term_i
+                    sample_flipped[x,y] = Sij
+                end
+                logψ_flipped[flip_term] = logψ_exact(peps, sample_flipped)
+            end
+        end
     end
 
     return logψ_flipped
