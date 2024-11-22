@@ -150,7 +150,7 @@ function divide_by_split(o1, o2, S)
     return o1, o2
 end
 
-function divide_by_spectrum(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; Sx=nothing, Sy=nothing, α=1)
+function divide_by_spectrum(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; Sx=nothing, Sy=nothing)
     peps = deepcopy(peps)
     
     if Sx === nothing
@@ -160,12 +160,10 @@ function divide_by_spectrum(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
         if i < size(peps, 1)
             S = Sx[i, j, :]
-            S = α .* S .+ (1-α) * S[1] 
             peps[i, j], peps[i+1, j] = divide_by_split(peps[i, j], peps[i+1,j], S)
         end
         if j < size(peps, 2)
             S = Sy[i, j, :]
-            S = α .* S .+ (1-α) * S[1] 
             peps[i, j], peps[i, j+1] = divide_by_split(peps[i, j], peps[i,j+1], S)
         end
     end

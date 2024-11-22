@@ -6,7 +6,6 @@ function sort_dict(Ek_terms; vertical=true)
     vert = Vector{Any}()
     four = Vector{Any}()
     other = Vector{Any}()
-    
     # loop through every term
     for flip_term in keys(Ek_terms)
         if flip_term == () # if no spin flip
