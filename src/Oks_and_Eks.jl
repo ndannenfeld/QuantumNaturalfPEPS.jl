@@ -120,13 +120,14 @@ function generate_Oks_and_Eks_multiproc(peps::PEPS, ham_op::TensorOperatorSum; t
         end
         write!(peps, Θ)
         @timeit timer "double_layer_envs" update_double_layer_envs!(peps) # update the double layer environments once for the peps
-        return Oks_and_Eks_multiproc(peps, ham_op, sample_nr; kwargs...)
+        return @timeit timer "Oks_and_Eks" Oks_and_Eks_multiproc(peps, ham_op, sample_nr; timer, kwargs...)
     end
     return Oks_and_Eks_
 end
 
 function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_weights=true, 
                                n_threads=Distributed.remotecall_fetch(()->Threads.nthreads(), workers()[1]),
+                               timer=TimerOutput(),
                                kwargs...)
 
     nr_procs = length(workers())
@@ -152,11 +153,11 @@ function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_
     end
 
     Threads.@threads for (i, out_i) in collect(enumerate(out))
-        
         i1 = k_eff * (i - 1) + 1
         i2 = k_eff * i
         
-        Oks[i1:i2, :], Eks[i1:i2], logψs[i1:i2], samples[i1:i2], logpcs[i1:i2] = fetch(out_i)
+        Ok, Eks[i1:i2], logψs[i1:i2], samples[i1:i2], logpcs[i1:i2] = fetch(out_i)
+        @timeit timer "copy_Oks" Oks[i1:i2, :] .= Ok
     end
     
     if importance_weights
