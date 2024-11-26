@@ -17,6 +17,7 @@ using QuantumNaturalGradient
 include("misc.jl")
 include("tensor_ops.jl")
 include("mps_ops.jl")
+include("Operations/Operations.jl")
 include("PEPS.jl")
 include("Environments.jl")
 include("sampling.jl")
