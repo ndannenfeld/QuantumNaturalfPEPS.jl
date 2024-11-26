@@ -283,10 +283,6 @@ end
 get_projected(peps::PEPS, Sij::Int64, i::Int64, j::Int64) = peps[i,j] * get_projector(Sij, siteind(peps, i, j))
 get_projected(peps::PEPS, S::Matrix{Int64}) = get_projected(peps, S, :, :)
 
-function get_flipped(peps::PEPS, S, i, j)
-    return get_projected(peps, (S.+1).%2, i, j)
-end
-
 function contract_peps_exact(peps)
     x = 1
     for i in 1:size(peps,1)
@@ -321,6 +317,7 @@ function write_Tensor!(peps, tensor, i, j)
         tensor = ITensor(tensor, indices)
     end
     perm = NDTensors.getperm(inds(peps[i,j]), indices)
+    # TODO: Why do you permute the tensors here?
     peps[i,j] = ITensor(permutedims(tensor.tensor, perm))
 end
 

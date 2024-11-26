@@ -1,23 +1,28 @@
 
-function reduce_dim(l1, l2)
-    m = zeros(dim(l1), dim(l2))
-    l = min(dim(l1), dim(l2))
-    m[1:l, 1:l] .= diagm(ones(l))
-    return ITensor(m, l1, l2)
-end
-
-function split_merge_slow(o1, o2; normalize_spectrum=true)
+function split_merge_slow(o1, o2; normalize_spectrum=true, directional=false)
     comm = commonind(o1, o2)
     l1 = uniqueinds(o1, comm)
     l2 = uniqueinds(o2, comm)
     
-    U, S, V = svd(o1 * o2, l1)
+    A = svd(o1 * o2, l1; maxdim=dim(comm))
+    U, S, V = A
     if normalize_spectrum
         S ./= norm(S)
     end
-    o1 = U * (sqrt.(S) * reduce_dim(S.tensor.inds[2], comm))
-    o2 = V * (sqrt.(S) * reduce_dim(S.tensor.inds[1], comm))
-    return o1, o2, S.tensor.storage[1:dim(comm)]
+    if directional
+        S = ITensor(S.tensor, (comm, A.v))
+        o1 = U * δ(A.u, comm)
+        o2 = V * S
+    else
+        comm = commonind(o1, o2)
+        S_sqrt = sqrt.(S)
+        S1 = ITensor(S_sqrt.tensor, (A.u, comm))
+        S2 = ITensor(S_sqrt.tensor, (comm, A.v))
+
+        o1 = U * S1
+        o2 = V * S2
+    end
+    return o1, o2, S.tensor.storage
 end
 
 inv_cutoff_func(x; cutoff=1e-6) = x < cutoff ? 0 : 1/x
@@ -30,9 +35,9 @@ function split_merge(o1, o2; cutoff=1e-6, directional=false, normalize_spectrum=
     
     M1_ =  reshape(M1.tensor.storage, dim(comm),dim(comm))
     D1, u1 = eigen(M1_)
-    #@show D1
     M2_ = reshape(M2.tensor.storage, dim(comm),dim(comm))
     D2, u2 = eigen(M2_)
+    
     #@show D1
     #@show D2
     D1_sqrt, D2_sqrt = sqrt.(abs.(D1)), sqrt.(abs.(D2))
@@ -91,7 +96,7 @@ end
 
 function super_orthonormalization!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; k=1000, error=1e-8, verbose=false, kwargs...)   
     Sx, Sy = split_merge!(peps; kwargs...)
-    local res
+    res = -1.
     for i in 2:k
         Sx2, Sy2 = split_merge!(peps; kwargs...)
         res = mean(abs2, Sx2 .- Sx)
@@ -138,21 +143,25 @@ function random_gauge_transform!(peps)
     return peps
 end
 
-function divide_by_split(o1, o2, S)
-    #@show inds(o1) inds(o2)
+function divide_on_split(o1, o2, S; directional=false)
     l = commonind(o1, o2)
     
-    inv_S = QuantumNaturalfPEPS.inv_cutoff_func.(sqrt.(S); cutoff=1e-6)
-    
-    Sinv = ITensor(diagm(inv_S), l, l')
-    o1 = apply(o1, Sinv)
-    o2 = apply(o2, Sinv)
-    return o1, o2
+    if directional
+        inv_S = QuantumNaturalfPEPS.inv_cutoff_func.(S; cutoff=1e-6)
+        Sinv = ITensor(diagm(inv_S), l, l')
+        o1 = apply(o2, Sinv)
+        return o1, o2
+    else
+        inv_S = QuantumNaturalfPEPS.inv_cutoff_func.(sqrt.(S); cutoff=1e-6)
+        
+        Sinv = ITensor(diagm(inv_S), l, l')
+        o1 = apply(o1, Sinv)
+        o2 = apply(o2, Sinv)
+        return o1, o2
+    end
 end
 
-function divide_by_spectrum(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; Sx=nothing, Sy=nothing)
-    peps = deepcopy(peps)
-    
+function divide_by_spectrum!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; Sx=nothing, Sy=nothing, directional=false)
     if Sx === nothing
         Sx, Sy, peps = QuantumNaturalfPEPS.super_orthonormalization!(peps)
     end
@@ -160,15 +169,16 @@ function divide_by_spectrum(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
         if i < size(peps, 1)
             S = Sx[i, j, :]
-            peps[i, j], peps[i+1, j] = divide_by_split(peps[i, j], peps[i+1,j], S)
+            peps[i, j], peps[i+1, j] = divide_on_split(peps[i, j], peps[i+1,j], S; directional)
         end
         if j < size(peps, 2)
             S = Sy[i, j, :]
-            peps[i, j], peps[i, j+1] = divide_by_split(peps[i, j], peps[i,j+1], S)
+            peps[i, j], peps[i, j+1] = divide_by_split(peps[i, j], peps[i,j+1], S; directional)
         end
     end
     return Sx, Sy, peps
 end
+divide_by_spectrum(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; kwargs...) = divide_by_spectrum!(deepcopy(peps); kwargs...)
 
 function multiply_spectrum!(peps, spectrum)
     spectrum = sqrt.(spectrum)
