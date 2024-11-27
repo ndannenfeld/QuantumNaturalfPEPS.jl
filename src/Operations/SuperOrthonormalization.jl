@@ -1,23 +1,32 @@
 
-function split_merge_slow(o1, o2; normalize_spectrum=true, directional=false)
+function split_merge_slow(o1, o2; normalize_spectrum=true, directional=false, new_dim=nothing, value=0)
     comm = commonind(o1, o2)
+    local link_new
+    if new_dim === nothing || new_dim == dim(comm)
+        link_new = comm
+    else
+        link_new = Index(new_dim, tags=tags(comm))
+    end
     l1 = uniqueinds(o1, comm)
     l2 = uniqueinds(o2, comm)
     
-    A = svd(o1 * o2, l1; maxdim=dim(comm))
+    A = svd(o1 * o2, l1; maxdim=dim(link_new))
     U, S, V = A
+    if value != 0
+        S.tensor.storage[dim(comm)+1:end] .= value
+    end
     if normalize_spectrum
         S ./= norm(S)
     end
     if directional
-        S = ITensor(S.tensor, (comm, A.v))
-        o1 = U * δ(A.u, comm)
-        o2 = V * S
+        S2 = ITensor(S.tensor, (link_new, A.v))
+        o1 = U * δ(A.u, link_new)
+        o2 = V * S2
     else
         comm = commonind(o1, o2)
         S_sqrt = sqrt.(S)
-        S1 = ITensor(S_sqrt.tensor, (A.u, comm))
-        S2 = ITensor(S_sqrt.tensor, (comm, A.v))
+        S1 = ITensor(S_sqrt.tensor, (A.u, link_new))
+        S2 = ITensor(S_sqrt.tensor, (link_new, A.v))
 
         o1 = U * S1
         o2 = V * S2
@@ -27,7 +36,7 @@ end
 
 inv_cutoff_func(x; cutoff=1e-6) = x < cutoff ? 0 : 1/x
 isnan2(x) = sum(isnan.(x)) > 0
-function split_merge(o1, o2; cutoff=1e-6, directional=false, normalize_spectrum=true)
+function split_merge(o1, o2; cutoff=1e-6, directional=false, normalize_spectrum=true, new_dim=nothing)
     # https://arxiv.org/pdf/1808.00680
     comm = commonind(o1, o2)
     M1 = o1 * conj(prime(o1, comm))
@@ -78,20 +87,21 @@ function split_merge(o1, o2; cutoff=1e-6, directional=false, normalize_spectrum=
     return o1n, o2n, S
 end
 
-function split_merge!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; split_merge_=split_merge, kwargs...)
-    Sx = Array{Float64}(undef, size(peps, 1)-1, size(peps, 2), peps.bond_dim)
-    Sy = Array{Float64}(undef, size(peps, 1), size(peps, 2)-1, peps.bond_dim)
+function split_merge!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; split_merge_=split_merge, new_dim=peps.bond_dim, kwargs...)
+    Sx = Array{Float64}(undef, size(peps, 1)-1, size(peps, 2), new_dim)
+    Sy = Array{Float64}(undef, size(peps, 1), size(peps, 2)-1, new_dim)
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
         if i < size(peps, 1)
-            peps[i, j], peps[i+1, j], S = split_merge_(peps[i, j], peps[i+1, j]; kwargs...)
+            peps[i, j], peps[i+1, j], S = split_merge_(peps[i, j], peps[i+1, j]; new_dim, kwargs...)
             Sx[i, j, :] .= S
         end
         if j < size(peps, 2)
-            peps[i, j], peps[i, j+1], S = split_merge_(peps[i, j], peps[i, j+1]; kwargs...)
+            peps[i, j], peps[i, j+1], S = split_merge_(peps[i, j], peps[i, j+1]; new_dim, kwargs...)
             Sy[i, j, :] .= S
         end
     end
-    return Sx, Sy
+    peps.bond_dim = new_dim
+    return Sx, Sy, peps
 end
 
 function super_orthonormalization!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; k=1000, error=1e-8, verbose=false, kwargs...)   
@@ -149,7 +159,7 @@ function divide_on_split(o1, o2, S; directional=false)
     if directional
         inv_S = QuantumNaturalfPEPS.inv_cutoff_func.(S; cutoff=1e-6)
         Sinv = ITensor(diagm(inv_S), l, l')
-        o1 = apply(o2, Sinv)
+        o2 = apply(o2, Sinv)
         return o1, o2
     else
         inv_S = QuantumNaturalfPEPS.inv_cutoff_func.(sqrt.(S); cutoff=1e-6)
@@ -173,7 +183,7 @@ function divide_by_spectrum!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITenso
         end
         if j < size(peps, 2)
             S = Sy[i, j, :]
-            peps[i, j], peps[i, j+1] = divide_by_split(peps[i, j], peps[i,j+1], S; directional)
+            peps[i, j], peps[i, j+1] = divide_on_split(peps[i, j], peps[i,j+1], S; directional)
         end
     end
     return Sx, Sy, peps
