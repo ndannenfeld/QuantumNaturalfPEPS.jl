@@ -43,7 +43,7 @@ function Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum, sample_
     eltype_ = eltype(peps)
     eltype_real = real(eltype_)
     
-    Oks = Matrix{eltype_}(undef, sample_nr, length(peps))
+    Oks = Matrix{eltype_}(undef, length(peps), sample_nr)
     Eks = Vector{eltype_}(undef, sample_nr)
     logψs = Vector{Complex{eltype_real}}(undef, sample_nr)
     samples = Vector{Matrix{Int}}(undef, sample_nr)
@@ -51,7 +51,7 @@ function Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum, sample_
     max_contract_dim = 0
 
     for i in 1:sample_nr
-        Ok_view = @view Oks[i, :]
+        Ok_view = @view Oks[:, i]
         _, Eks[i], logψs[i], samples[i], logpc[i], max_bond = Ok_and_Ek(peps, ham_op; timer, Ok=Ok_view, kwargs...)
         if max_bond > max_contract_dim
             max_contract_dim = max_bond
@@ -59,7 +59,7 @@ function Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum, sample_
     end
     
     #return Ok, E_loc, logψ, samples, compute_importance_weights(logψ, logpc)
-    Dict(:Oks => Oks, :Eks => Eks, :logψs => logψs, :samples => samples, :weights => compute_importance_weights(logψs, logpc), :max_contract_dim => max_contract_dim)
+    Dict(:Oks => transpose(Oks), :Eks => Eks, :logψs => logψs, :samples => samples, :weights => compute_importance_weights(logψs, logpc), :max_contract_dim => max_contract_dim)
     # returns Gradient, local Energy, log(<ψ|S>), samples S, p
 end
 
@@ -118,7 +118,7 @@ function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_w
     end
 
     #return transpose(Oks), Eks, logψs, samples, weights
-    return Dict(:Oks => Oks, :Eks => Eks, :logψs => logψs, :samples => samples, :weights => weights, :max_contract_dim => max_contract_dim)
+    return Dict(:Oks => transpose(Oks), :Eks => Eks, :logψs => logψs, :samples => samples, :weights => weights, :max_contract_dim => max_contract_dim)
 end
 
 #### Multiprocessing
@@ -160,15 +160,16 @@ function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_
     
     if Oks === nothing
         #Oks = Matrix{eltype_}(undef, nr_parameters, sample_nr_eff)
-        Oks = Matrix{eltype_}(undef, sample_nr_eff, nr_parameters)
+        Oks = Matrix{eltype_}(undef, nr_parameters, sample_nr_eff)
     end
 
     Threads.@threads for (i, out_i) in collect(enumerate(out))
         i1 = k_eff * (i - 1) + 1
         i2 = k_eff * i
         
-        Ok, Eks[i1:i2], logψs[i1:i2], samples[i1:i2], logpcs[i1:i2], max_bond = fetch(out_i)
-        @timeit timer "copy_Oks" Oks[i1:i2, :] .= Ok
+        out_dict = fetch(out_i)
+        Eks[i1:i2], logψs[i1:i2], samples[i1:i2], logpcs[i1:i2], max_bond = out_dict[:Eks], out_dict[:logψs], out_dict[:samples], out_dict[:weights], out_dict[:max_contract_dim]
+        @timeit timer "copy Oks" Oks[:, i1:i2] .= transpose(out_dict[:Oks])
         if max_bond > max_contract_dim
             max_contract_dim = max_bond
         end
@@ -180,5 +181,5 @@ function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_
         weights = logpcs
     end
     
-    return Dict(:Oks => Oks, :Eks => Eks, :logψs => logψs, :samples => samples, :weights => weights, :max_contract_dim => max_contract_dim)
+    return Dict(:Oks => transpose(Oks), :Eks => Eks, :logψs => logψs, :samples => samples, :weights => weights, :max_contract_dim => max_contract_dim)
 end
