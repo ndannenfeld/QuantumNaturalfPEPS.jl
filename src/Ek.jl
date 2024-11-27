@@ -119,7 +119,7 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
     end
 
     c = (con_right*con_left)[]
-    if c < 0
+    if isreal(c) && c < 0
         c = complex(c)
     end
     logψ_flipped = log(c) + f
@@ -175,7 +175,7 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
         flip = flip * h_envs_r[maxy]
     end
     c = contract(flip)[]
-    if c < 0
+    if isreal(c) && c < 0
         c = complex(c)
     end
     logψ_flipped = log(c) + f

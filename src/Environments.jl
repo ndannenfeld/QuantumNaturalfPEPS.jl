@@ -67,7 +67,7 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environ
     end
     
     # once we calculated all environments we calculate <ψ|S> using the environments
-    return get_logψ(env_top, env_down; kwargs...), env_top, env_down
+    return get_logψ(env_top, env_down; kwargs...), env_top, env_down, max_bond
 end
 
 # calculates the environments for a given row and contracts that with env_row_above
