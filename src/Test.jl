@@ -24,8 +24,8 @@ function Test_Ek(peps::PEPS, ham::OpSum; it=1)
 end
 
 function Test_Ek(peps::PEPS, ham_op; it=1)
-    E = Array{Float64}(undef, it)
-    Enum = Array{Float64}(undef, it)
+    E = Array{eltype(peps)}(undef, it)
+    Enum = Array{eltype(peps)}(undef, it)
 
     func = get_logψ_func(peps)
     for i in 1:it
@@ -55,7 +55,7 @@ function get_Ek(peps::PEPS, ham::OpSum; it=100)
 end
 
 function get_Ek(peps, ham_op; it=100)
-    E = Array{Float64}(undef, it)
+    E = Array{eltype(peps)}(undef, it)
 
     update_double_layer_envs!(peps)
 

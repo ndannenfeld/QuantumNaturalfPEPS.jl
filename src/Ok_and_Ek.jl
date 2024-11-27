@@ -7,7 +7,7 @@ function Ok_and_Ek(peps, ham_op; timer=TimerOutput(), Ok=nothing, resample=false
         S = QuantumNaturalGradient.resample_with_H(S, ham_op; resample_energy)
     end
     
-    logψ, env_top, env_down = @timeit timer "vertical_envs" get_logψ_and_envs(peps, S, env_top) # compute the environments of the peps according to that sample
+    logψ, env_top, env_down, max_bond = @timeit timer "vertical_envs" get_logψ_and_envs(peps, S, env_top) # compute the environments of the peps according to that sample
     h_envs_r, h_envs_l = @timeit timer "horizontal_envs" get_all_horizontal_envs(peps, env_top, env_down, S) # computes the horizontal environments of the already sampled peps
     
     # initialize the flipped logψ dictionary, will be used to compute other observables or for the resampling
@@ -25,5 +25,5 @@ function Ok_and_Ek(peps, ham_op; timer=TimerOutput(), Ok=nothing, resample=false
         logpc = 2* real(logψ)
     end
 
-    return grad, E_loc, logψ, S, logpc
+    return grad, E_loc, logψ, S, logpc, max_bond
 end
