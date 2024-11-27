@@ -48,18 +48,16 @@ function Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum, sample_
     logψs = Vector{Complex{eltype_real}}(undef, sample_nr)
     samples = Vector{Matrix{Int}}(undef, sample_nr)
     logpc = Vector{eltype_real}(undef, sample_nr)
-    max_contract_dim = 0
+    contract_dims = Vector{Int}(undef, sample_nr)
 
     for i in 1:sample_nr
         Ok_view = @view Oks[:, i]
-        _, Eks[i], logψs[i], samples[i], logpc[i], max_bond = Ok_and_Ek(peps, ham_op; timer, Ok=Ok_view, kwargs...)
-        if max_bond > max_contract_dim
-            max_contract_dim = max_bond
-        end
+        _, Eks[i], logψs[i], samples[i], logpc[i], contract_dims[i] = Ok_and_Ek(peps, ham_op; timer, Ok=Ok_view, kwargs...)
+        
     end
     
     #return Ok, E_loc, logψ, samples, compute_importance_weights(logψ, logpc)
-    Dict(:Oks => transpose(Oks), :Eks => Eks, :logψs => logψs, :samples => samples, :weights => compute_importance_weights(logψs, logpc), :max_contract_dim => max_contract_dim)
+    Dict(:Oks => transpose(Oks), :Eks => Eks, :logψs => logψs, :samples => samples, :weights => compute_importance_weights(logψs, logpc), :contract_dims => contract_dims)
     # returns Gradient, local Energy, log(<ψ|S>), samples S, p
 end
 
