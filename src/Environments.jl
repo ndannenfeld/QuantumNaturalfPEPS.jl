@@ -47,7 +47,7 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environ
                            alg="densitymatrix", kwargs...)
     
     overwrite = true    # if env_top is given and the bond dimension is sufficient, we do not need to calculate it again
-    if isdefined(env_top, 1) && maxlinkdim(env_top[1].env) >= peps.contract_dim
+    if isassigned(env_top, 1) && maxlinkdim(env_top[1].env) >= peps.contract_dim
         overwrite = false
     end
     

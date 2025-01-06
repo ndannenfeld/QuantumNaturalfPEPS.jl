@@ -142,7 +142,7 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
     end
 
     # Sort the y values
-    if ys[1] > ys[2]
+    if length(ys) == 2 && ys[1] > ys[2]
         ys = reverse(ys)
         Sijs = reverse(Sijs)
     end
@@ -243,9 +243,9 @@ function get_Ek(peps::PEPS, ham::OpSum, sample; kwargs...)
     return get_Ek(peps, ham_op, sample; kwargs...)
 end
 
-function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, sample; kwargs...)
+function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, sample; env_top=Array{Environment}(undef, size(S,1)-1), kwargs...)
     # get the environment tensors
-    logψ, env_top, env_down = get_logψ_and_envs(peps, sample) # compute the environments of the peps according to that sample
+    logψ, env_top, env_down = get_logψ_and_envs(peps, sample, env_top) # compute the environments of the peps according to that sample
     h_envs_r, h_envs_l = get_all_horizontal_envs(peps, env_top, env_down, sample) # computes the horizontal environments of the already sampled peps
     return get_Ek(peps, ham_op, env_top, env_down, sample, logψ, h_envs_r, h_envs_l; kwargs...)
 end

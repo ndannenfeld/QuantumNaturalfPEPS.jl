@@ -62,7 +62,7 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
     E_mpo = E_mpo.*C[1,:]
     E_mpo = E_mpo.*C[2,:]
 
-    E_mps = apply(E_mpo, peps_double_env.env; maxdim, cutoff)
+    E_mps = contract(E_mpo, peps_double_env.env; maxdim, cutoff)
 
     return Environment(E_mps, peps_double_env.f; normalize=true)
 end
@@ -84,19 +84,20 @@ end
 
 # calculates the bra and the ket layer and applies (if available) already sampled rows (from above)
 function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
-    bra = MPO(peps[row, :])
+    bra = conj(MPO(peps[row, :]))
+    ket = copy(MPO(peps[row, :]))
 
     if row != 1   
-        bra = contract(bra, env_top[row-1].env; maxdim=peps.sample_dim, cutoff=peps.sample_cutoff)
+        bra = contract(bra, (env_top[row-1].env); maxdim=peps.sample_dim, cutoff=peps.sample_cutoff)
+        ket = contract(ket, conj(env_top[row-1].env); maxdim=peps.sample_dim, cutoff=peps.sample_cutoff)
     end
 
-    ket = copy(bra)
     rename_indices!(ket)
     
     if row != size(peps, 1)
         rename_indices!(ket, indices_outer, vcat(commoninds.(peps[row, :], peps[row+1, :])...))
     end
-    return conj(bra), ket
+    return bra, ket
 end
 
 # calculates the unsampled contractions along a row (from right to left the sites are contracted along the physical Index)
