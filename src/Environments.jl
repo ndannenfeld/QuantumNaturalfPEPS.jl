@@ -25,10 +25,19 @@ Base.getproperty(x::ReverseEnvironment, y::Symbol) = getproperty(reverse(x), y)
 Base.reverse(env::ReverseEnvironment) = getfield(env, :env)
 
 function normalize!(env::Environment)
-    for env_i in env.env
-        norm = max_norm(env_i)
-        env_i ./= norm
-        env.f += log(norm)
+    #If it is orthogonal, normalizing the MPS is cheap
+    if env.env.llim == 0 && env.env.rlim == 2
+        norm_ = norm(env.env[1])
+        env.env[1] ./= norm_
+        env.f += log(norm_)
+    else
+        for env_i in env.env
+            norm_ = max_norm(env_i)
+            env_i ./= norm_
+            env.f += log(norm_)
+        end
+        env.env.llim = 0
+        env.env.rlim = length(env.env) + 1
     end
     return env
 end
@@ -84,10 +93,9 @@ function generate_env_row(peps_projected, contract_dim; env_row_above=nothing, a
 end
 
 function get_logψ(env_top::Vector{Environment}, env_down::Vector{Environment}; pos=Int(ceil(length(env_top)/2)))
-    ψS = contract(env_top[pos].env.*env_down[end-pos+1].env)[1]
-    logψS = log(Complex(ψS))
-    # TODO: Don't you want to use this instead here?
-    #logψS = _log_or_not_dot(env_top[pos].env, env_down[end-pos+1].env, true; dag=false)
+    #ψS = contract(env_top[pos].env.*env_down[end-pos+1].env)[1]
+    #logψS = log(Complex(ψS))
+    logψS = _log_or_not_dot(env_top[pos].env, env_down[end-pos+1].env, true; dag=false)
     return logψS + env_top[pos].f + env_down[end-pos+1].f
 end
 

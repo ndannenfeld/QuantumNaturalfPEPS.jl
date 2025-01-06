@@ -1,3 +1,4 @@
+using ITensors: sim!, deprecate_make_inds_match!, check_hascommoninds
 # From abstractmps.jl
 function _log_or_not_dot(
     M1::MPST, M2::MPST, loginner::Bool; dag=true, make_inds_match::Bool=true
@@ -12,7 +13,7 @@ function _log_or_not_dot(
     end
     sim!(linkinds, M1dag)
     M1dag, M2 = deprecate_make_inds_match!(
-      _log_or_not_dot, M1dag, M2, loginner; make_inds_match
+      ITensors._log_or_not_dot, M1dag, M2, loginner; make_inds_match
     )
     check_hascommoninds(siteinds, M1dag, M2)
     O = M1dag[1] * M2[1]
