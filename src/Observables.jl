@@ -1,4 +1,4 @@
-function get_ExpectationValue(peps::PEPS, O; it=100, threaded=false)
+function get_ExpectationValue(peps::PEPS, O; it=100, threaded=false, multiproc=false)
     hilbert = siteinds(peps)
     if !(O isa Vector)
         O = [O]
@@ -8,7 +8,11 @@ function get_ExpectationValue(peps::PEPS, O; it=100, threaded=false)
     for i in 1:length(O)
         O_op[i] = TensorOperatorSum(O[i], hilbert)
     end
-    if threaded
+    if multiproc
+        #get_ExpectationValues_singlethread(peps, [O_op[1]]; it=1)
+        return get_ExpectationValues_multiproc(peps, O_op; it)
+    elseif threaded
+        get_ExpectationValues_singlethread(peps, [O_op[1]]; it=1)
         return get_ExpectationValues_multithread(peps, O_op; it)
     else
         return get_ExpectationValues_singlethread(peps, O_op; it)
@@ -26,12 +30,13 @@ function get_ExpectationValues_multithread(peps, O_op; it=100)
     Threads.@threads for i in 1:nr_threads
             slice = (1+(i-1)*k):(i*k)
             Obser = @view Obs[slice, :]
-            logψ = @view logψs[slice]
-            logpc = @view logpcs[slice]
-            get_ExpectationValues!(peps, O_op, Obser, logψ, logpc; it=k)
+            logψ_thread = @view logψs[slice]
+            logpc_thread = @view logpcs[slice]
+            get_ExpectationValues!(peps, O_op, Obser, logψ_thread, logpc_thread; it=k)
     end
 
-    return Obs, compute_importance_weights(logψs, logpcs)
+    #return Obs, logψs, logpcs
+    return Dict(:Obs => Obs, :logψs => logψs, :logpcs => logpcs)
 end
 
 function get_ExpectationValues_singlethread(peps, O_op; it=100)
@@ -59,4 +64,32 @@ function get_ExpectationValues!(peps, O_op, Observable, logψ, logpc; it=100)
     end
 
     return Observable, logψ, logpc
+end
+
+function get_ExpectationValues_multiproc(peps, O_op; it=100, 
+    n_threads=Distributed.remotecall_fetch(()->Threads.nthreads(), workers()[1]),
+    kwargs...)
+
+    nr_procs = length(workers())
+    k = ceil(Int, it / nr_procs)
+    k_thread = ceil(Int, k / n_threads)
+    k_eff = k_thread * n_threads
+    sample_nr_eff = k_eff * nr_procs
+
+    out = [Distributed.remotecall(() -> get_ExpectationValues_multithread(peps, O_op; it=k), w) for w in workers()]
+
+    Obs = Matrix{ComplexF64}(undef, sample_nr_eff, length(O_op))
+    logψs = Vector{ComplexF64}(undef, sample_nr_eff)
+    logpcs = Vector{Float64}(undef, sample_nr_eff)
+    contract_dims = Vector{Int}(undef, sample_nr_eff)
+
+    Threads.@threads for (i, out_i) in collect(enumerate(out))
+        i1 = k_eff * (i - 1) + 1
+        i2 = k_eff * i
+
+        out_dict = fetch(out_i)
+        Obs[i1:i2, :], logψs[i1:i2], logpcs[i1:i2] = out_dict[:Obs], out_dict[:logψs], out_dict[:logpcs]
+    end
+
+    return Obs, compute_importance_weights(logψs, logpcs)
 end
