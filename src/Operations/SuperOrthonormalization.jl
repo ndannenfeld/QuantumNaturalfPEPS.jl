@@ -87,7 +87,7 @@ function split_merge(o1, o2; cutoff=1e-6, directional=false, normalize_spectrum=
     return o1n, o2n, S
 end
 
-function split_merge!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; split_merge_=split_merge, new_dim=peps.bond_dim, kwargs...)
+function split_merge!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; split_merge_=split_merge, new_dim=maxbonddim(peps), kwargs...)
     Sx = Array{Float64}(undef, size(peps, 1)-1, size(peps, 2), new_dim)
     Sy = Array{Float64}(undef, size(peps, 1), size(peps, 2)-1, new_dim)
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
@@ -100,7 +100,9 @@ function split_merge!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; sp
             Sy[i, j, :] .= S
         end
     end
-    peps.bond_dim = new_dim
+    if isa(peps, QuantumNaturalfPEPS.PEPS)
+        peps.bond_dim = new_dim
+    end
     return Sx, Sy, peps
 end
 

@@ -21,6 +21,8 @@ mutable struct PEPS
     end
 end
 
+maxbonddim(peps::PEPS) = peps.bond_dim
+
 Base.size(peps::PEPS, args...) = size(peps.tensors, args...)
 Base.getindex(peps::PEPS, args...) = getindex(peps.tensors, args...)
 Base.setindex!(peps::PEPS, v, i::Int, j::Int) = (peps.tensors[i, j] = v)
@@ -95,7 +97,7 @@ end
 
 function shift!(peps::PEPS, shift::Bool) 
     if shift
-        return shift!(peps, 2 * tensor_std(peps) / peps.bond_dim)
+        return shift!(peps, 2 * tensor_std(peps) / maxbonddim(peps))
     else
         return peps
     end
@@ -408,11 +410,11 @@ end
 
 function generate_vectors(peps, iPEPS, vector_type)
     if vector_type == :random
-        return [rand(peps.bond_dim) for i in 1:2*size(peps,1) + 2*size(peps,2) + 4]
+        return [rand(maxbonddim(peps)) for i in 1:2*size(peps,1) + 2*size(peps,2) + 4]
     elseif vector_type == :four
-        return [rand(peps.bond_dim) for i in 1:4]
+        return [rand(maxbonddim(peps)) for i in 1:4]
     elseif vector_type == :ones
-        return [ones(peps.bond_dim) for i in 1:4]
+        return [ones(maxbonddim(peps)) for i in 1:4]
     else
         throw(ArgumentError("Unrecognized vector_type: $vector_type"))
     end
