@@ -5,8 +5,12 @@ function get_ExpectationValue(peps::PEPS, O; it=100, threaded=false, multiproc=f
     end
     O_op = Array{TensorOperatorSum}(undef, length(O))
 
-    for i in 1:length(O)
-        O_op[i] = TensorOperatorSum(O[i], hilbert)
+    if O[1] isa QuantumNaturalGradient.TensorOperatorSum 
+        O_op = O
+    else
+        for i in 1:length(O)
+            O_op[i] = TensorOperatorSum(O[i], hilbert)
+        end
     end
     if multiproc
         #get_ExpectationValues_singlethread(peps, [O_op[1]]; it=1)
@@ -55,11 +59,12 @@ function get_ExpectationValues!(peps, O_op, Observable, logψ, logpc; it=100)
 
         logψ[i], env_top, env_down, max_bond = get_logψ_and_envs(peps, S, env_top) 
         h_envs_r, h_envs_l = get_all_horizontal_envs(peps, env_top, env_down, S)
+        fourb_envs_r, fourb_envs_l = get_all_4b_envs(peps, env_top, env_down, S)
             
         logψ_flipped = Dict{Any, Number}()
         for j in 1:length(O_op)
             O_terms = QuantumNaturalGradient.get_precomp_sOψ_elems(O_op[j], S; get_flip_sites=true)
-            Observable[i,j] = get_Ek(peps, O_op[j], env_top, env_down, S, logψ[i], h_envs_r, h_envs_l; logψ_flipped, Ek_terms=O_terms)
+            Observable[i,j] = get_Ek(peps, O_op[j], env_top, env_down, S, logψ[i], h_envs_r, h_envs_l; fourb_envs_r, fourb_envs_l, logψ_flipped, Ek_terms=O_terms)
         end
     end
 
@@ -92,4 +97,13 @@ function get_ExpectationValues_multiproc(peps, O_op; it=100,
     end
 
     return Obs, compute_importance_weights(logψs, logpcs)
+end
+
+function get_ExpectationValue_sample(peps, O_op, S)
+    O_loc = Array{Complex}(undef, 1, length(O_op))
+    logψ = Array{Complex}(undef, 1)
+    logpc = Array{Complex}(undef, 1)
+    
+    get_ExpectationValues!(peps, O_op, O_loc, logψ, logpc; it=1)
+    return O_loc
 end
