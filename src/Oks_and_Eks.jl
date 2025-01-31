@@ -77,8 +77,14 @@ function generate_Oks_and_Eks_threaded(peps::PEPS, ham_op::TensorOperatorSum; ti
 end
 
 function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_weights=true,
-                                               timer=TimerOutput(), nr_threads=Threads.nthreads(), kwargs...)
+                              timer=TimerOutput(), nr_threads=Threads.nthreads(), seed=nothing,
+                              kwargs...)
     
+    
+    if seed !== nothing
+        Random.seed!(seed)
+    end
+
     nr_parameters = length(peps)
     k = ceil(Int, sample_nr / nr_threads)
     
@@ -94,7 +100,9 @@ function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_w
     logpcs = Matrix{eltype_real}(undef, k, nr_threads)
     contract_dims = Matrix{Int}(undef, k, nr_threads)
     
+    seed = rand(UInt)
     Threads.@threads for i in 1:nr_threads
+        Random.seed!(seed + i)
         for j in 1:k
             Ok = @view Oks[:, j, i]
             _, Eks[j, i], logψs[j, i], samples[j, i], logpcs[j, i], contract_dims[j, i] = Ok_and_Ek(peps, ham_op; Ok, kwargs...)
@@ -142,8 +150,10 @@ function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_
     k_eff = k_thread * n_threads
     sample_nr_eff = k_eff * nr_procs
     nr_parameters = length(peps)
+
+    seed = rand(UInt)
     # TODO: Send ham_op only once through the network
-    out = [Distributed.remotecall(() -> Oks_and_Eks_threaded(peps, ham_op, k; importance_weights=false, kwargs...), w) for w in workers()]
+    out = [Distributed.remotecall(() -> Oks_and_Eks_threaded(peps, ham_op, k; importance_weights=false, seed=seed + w, kwargs...), w) for w in workers()]
     
     eltype_ = eltype(peps)
     eltype_real = real(eltype_)

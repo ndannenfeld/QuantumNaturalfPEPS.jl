@@ -1,6 +1,9 @@
 
 # Calculates the Energy and Gradient of a given peps and hamiltonian
-function Ok_and_Ek(peps, ham_op; timer=TimerOutput(), Ok=nothing, resample=false, correct_sampling_error=true, resample_energy=0, kwargs...)
+function Ok_and_Ek(peps, ham_op; timer=TimerOutput(), Ok=nothing, 
+                   resample=false, correct_sampling_error=true, resample_energy=0, # TODO: remove
+                   )
+    
     S, logpc, env_top = @timeit timer "sampling" get_sample(peps) # draw a sample
     
     if resample
@@ -26,4 +29,41 @@ function Ok_and_Ek(peps, ham_op; timer=TimerOutput(), Ok=nothing, resample=false
     end
 
     return grad, E_loc, logψ, S, logpc, max_bond
+end
+
+
+
+"""
+Calculates logψ and the environments of a given peps and sample
+"""
+function get_logψ_function(peps; kwargs...)
+    function logψ_func(sample)
+        logψ, = get_logψ_and_envs(peps, sample; kwargs...)
+        return logψ
+    end
+    return logψ_func
+end
+"""
+Calculates the Energy of a given a peps and hamiltonian
+"""
+function Ek(peps, ham_op; timer=TimerOutput(),
+            slow_energy=false, slow_energy_pos=size(peps, 1) ÷ 2)
+
+    S, logpc, env_top = @timeit timer "sampling" get_sample(peps) # draw a sample
+
+    logψ, env_top, env_down, max_bond = @timeit timer "vertical_envs" get_logψ_and_envs(peps, S, env_top) # compute the environments of the peps according to that sample
+
+    local E_loc
+    if slow_energy
+        func = get_logψ_function(peps; pos=slow_energy_pos)
+        E_loc = convert_if_real(QuantumNaturalGradient.get_Ek(S, ham_op, func))
+    else
+        h_envs_r, h_envs_l = @timeit timer "horizontal_envs" get_all_horizontal_envs(peps, env_top, env_down, S) # computes the horizontal environments of the already sampled peps
+
+        # initialize the flipped logψ dictionary, will be used to compute other observables or for the resampling
+        logψ_flipped = Dict{Any, Number}() 
+        Ek_terms = @timeit timer "precomp_sHψ_elems"  QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, S; get_flip_sites=true)
+        E_loc = @timeit timer "energy" get_Ek(peps, ham_op, env_top, env_down, S, logψ, h_envs_r, h_envs_l; logψ_flipped, Ek_terms, timer) # compute the local energy
+    end
+    return E_loc, logψ, S, logpc, max_bond
 end
