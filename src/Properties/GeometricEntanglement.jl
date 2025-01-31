@@ -1,14 +1,5 @@
-function constant_update(t, p, factor=0.1)
-    d1 = t .- p
-    d = sign.(d1) .* min.(factor, abs.(d1))
-    if norm(t .- d) < 1e-4
-        return constant_update(t, p, 0.9*factor)
-    end
-    return t - d
-end
-
-function exp_update(t, p, factor=0.1)
-    return factor .* p .+ sqrt(1-factor^2) .* t
+function exp_update(p, t, factor=0.1)
+    return factor .* t .+ sqrt(1-factor^2) .* p
 end
 
 function basis_change(peps, ops::Array{ITensor, 2})
@@ -43,15 +34,16 @@ function get_rotator(Ok_Tensor, S; update=exp_update, factor=0.05)
 
     t = Ok_Tensor.tensor.storage
     t = t ./ norm(t)
-    v = randn(2)
-    
+    v = randn(typeof(t[1]), 2)
+    t = conj(t)
+
     if S == 0
         p = [1, 0]
         t = update(p, t, factor)
         t ./= norm(t)
         v = v - t' * v * t
-        v ./= norm(v) * sign(v[2])
-        u = zeros(2, 2)
+        v ./= norm(v)
+        u = zeros(typeof(t[1]), 2, 2)
         u[:,1] = t
         u[:,2] = v
     else
@@ -59,8 +51,8 @@ function get_rotator(Ok_Tensor, S; update=exp_update, factor=0.05)
         t = update(p, t, factor)
         t ./= norm(t)
         v = v - t' * v * t
-        v ./= norm(v) * sign(v[2])
-        u = zeros(2, 2)
+        v ./= norm(v)
+        u = zeros(typeof(t[1]), 2, 2)
         u[:,2] = t
         u[:,1] = v
     end
@@ -96,7 +88,7 @@ function rotate_to_product_state(peps, S=zeros(Int, size(peps)...); k=20, verbos
         Us = [get_rotator(Ok_Tensors[i, j], S[i,j]; kwargs...) for j in 1:size(peps, 2)]
         
         peps = basis_change(peps, Us, i)
-        c = maximum([minimum(abs.(Ok_Tensor)/ norm(Ok_Tensor)) for Ok_Tensor in Ok_Tensors])
+        c = maximum(minimum.(real.([abs.(Ok_Tensor)/ norm(Ok_Tensor) for Ok_Tensor in Ok_Tensors])))
         if verbose
             @info "$i: $(round(c, digits=5)), $(round(logψ, digits=5))"
         end
@@ -153,7 +145,7 @@ function rotate_to_product_state_sweep_down(peps, logψ, env_top, env_down, h_en
         Us = [QuantumNaturalfPEPS.get_rotator(Ok_Tensors[j], S[i, j]; kwargs...) for j in 1:size(peps, 2)]
         
         peps = QuantumNaturalfPEPS.basis_change(peps, Us, i)
-        ci = maximum([minimum(abs.(Ok_Tensor)/ norm(Ok_Tensor)) for Ok_Tensor in Ok_Tensors])
+        ci = maximum(minimum.(real.([abs.(Ok_Tensor)/ norm(Ok_Tensor) for Ok_Tensor in Ok_Tensors])))
         c = max(c, ci)
         
         peps_projected = QuantumNaturalfPEPS.get_projected(peps, S)
@@ -187,7 +179,7 @@ function rotate_to_product_state_sweep_up(peps, logψ, env_top, env_down, h_envs
         Us = [QuantumNaturalfPEPS.get_rotator(Ok_Tensors[j], S[i, j]; kwargs...) for j in 1:size(peps, 2)]
         
         peps = QuantumNaturalfPEPS.basis_change(peps, Us, i)
-        ci = maximum([minimum(abs.(Ok_Tensor)/ norm(Ok_Tensor)) for Ok_Tensor in Ok_Tensors])
+        ci = maximum(minimum.(real.([abs.(Ok_Tensor)/ norm(Ok_Tensor) for Ok_Tensor in Ok_Tensors])))
         c = max(c, ci)
         
         peps_projected = QuantumNaturalfPEPS.get_projected(peps, S)
