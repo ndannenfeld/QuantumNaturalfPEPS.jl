@@ -169,9 +169,9 @@ function generate_Eks_multiproc(peps::PEPS, ham_op::TensorOperatorSum; timer=Tim
 
         if !no_write
             write!(peps, Θ)
+            @timeit timer "double_layer_envs" update_double_layer_envs!(peps)
         end
-
-        @timeit timer "double_layer_envs" update_double_layer_envs!(peps)
+        
         return @timeit timer "Eks_multiproc" Eks_multiproc(peps, ham_op, sample_nr; timer, kwargs...)
     end
     return Eks_

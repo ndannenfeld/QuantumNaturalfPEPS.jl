@@ -47,17 +47,17 @@ end
 Calculates the Energy of a given a peps and hamiltonian
 """
 function Ek(peps, ham_op; timer=TimerOutput(),
-            slow_energy=false, slow_energy_pos=size(peps, 1) ÷ 2)
+            slow_energy=false, slow_energy_pos=(size(peps, 1)-1) ÷ 2)
 
     S, logpc, env_top = @timeit timer "sampling" get_sample(peps) # draw a sample
 
-    logψ, env_top, env_down, max_bond = @timeit timer "vertical_envs" get_logψ_and_envs(peps, S, env_top) # compute the environments of the peps according to that sample
-
-    local E_loc
+    local E_loc, logψ, max_bond
     if slow_energy
+        logψ, env_top, env_down, max_bond = @timeit timer "vertical_envs" get_logψ_and_envs(peps, S, env_top; pos=slow_energy_pos) # compute the environments of the peps according to that sample
         func = get_logψ_function(peps; pos=slow_energy_pos)
         E_loc = convert_if_real(QuantumNaturalGradient.get_Ek(S, ham_op, func))
     else
+        logψ, env_top, env_down, max_bond = @timeit timer "vertical_envs" get_logψ_and_envs(peps, S, env_top) # compute the environments of the peps according to that sample
         h_envs_r, h_envs_l = @timeit timer "horizontal_envs" get_all_horizontal_envs(peps, env_top, env_down, S) # computes the horizontal environments of the already sampled peps
 
         # initialize the flipped logψ dictionary, will be used to compute other observables or for the resampling
