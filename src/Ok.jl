@@ -1,9 +1,13 @@
 # calculates the gradient: d(<ψ|S>)/d(Θ) / <ψ|S>
-function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}, logψ::Number; Ok=nothing, mask=peps.mask)
+function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, logψ::Number;
+                h_envs_r=nothing, h_envs_l=nothing, Ok=nothing, mask=peps.mask)
     if Ok === nothing
         Ok = Vector{eltype(peps)}(undef, length(peps))
     end
-    
+    if h_envs_r === nothing || h_envs_l === nothing
+        h_envs_r, h_envs_l = get_all_horizontal_envs(peps, env_top, env_down, S) # computes the horizontal environments of the already sampled peps
+    end
+
     pos = 1
     shift = 0
     
@@ -12,14 +16,14 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
             if mask[i,j]!=0
                 Ok_Tensor = 1
                 f = 0
-                if j != size(peps,2)
+                if j != size(peps, 2)
                     Ok_Tensor *= h_envs_r[i,j]
                 end
                 if i != 1
                     Ok_Tensor *= env_top[i-1].env[j]
                     f += env_top[i-1].f
                 end
-                if i != size(peps,1)
+                if i != size(peps, 1)
                     Ok_Tensor *= env_down[end-i+1].env[j]
                     f += env_down[end-i+1].f
                 end

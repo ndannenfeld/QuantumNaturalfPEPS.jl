@@ -72,8 +72,8 @@ end
 
 function Base.length(peps::PEPS; mask=peps.mask)
     x = 0
-    for i in 1:size(peps,1)
-        for j in 1:size(peps,2)
+    for i in 1:size(peps, 1)
+        for j in 1:size(peps, 2)
             if mask[i,j]!=0
                 x += length(ITensors.tensor(peps.tensors[i,j]))
             end
@@ -111,11 +111,11 @@ function shift!(peps::PEPS, shift::Number)
 end
 
 function write!(peps::PEPS, θ::Vector{T}; reset_double_layer=true, mask=peps.mask) where T# Writes the vector θ into the tensors.
-    @assert eltype(peps) == T "The type of the PEPS and the vector θ must be the same type $T != $(eltype(peps))"
+    @assert eltype(peps) == T "The type of the PEPS is $(eltype(peps)) and the type of the vector θ is $T. They must be the same type."
     pos = 1
     for i in 1:size(peps, 1)
         for j in 1:size(peps, 2)
-            if mask[i,j]!=0
+            if mask[i,j] != 0
                 shift = prod(dim.(inds(peps[i,j])))
                 peps[i, j][:] = reshape(θ[pos:(pos+shift-1)], dim.(inds(peps[i,j])))
                 pos += shift
@@ -287,8 +287,8 @@ get_projected(peps::PEPS, S::Matrix{Int64}) = get_projected(peps, S, :, :)
 
 function contract_peps_exact(peps)
     x = 1
-    for i in 1:size(peps,1)
-        for j in 1:size(peps,2)
+    for i in 1:size(peps, 1)
+        for j in 1:size(peps, 2)
             x *= peps[i,j]
         end
     end
@@ -302,10 +302,10 @@ function write_Tensor!(peps, tensor, i, j)
     if j != 1
         push!(indices, commoninds(peps[i,j], peps[i,j-1])...)
     end
-    if i != size(peps,1)
+    if i != size(peps, 1)
         push!(indices, commoninds(peps[i,j], peps[i+1,j])...)
     end
-    if j != size(peps,2)
+    if j != size(peps, 2)
         push!(indices, commoninds(peps[i,j], peps[i,j+1])...)
     end
     if i != 1
@@ -350,15 +350,15 @@ function iPEPS_to_fPEPS!(peps::PEPS, iPEPS, Lx, Ly, pattern; vectors=:random)
 end
 
 function iPEPS_to_fPEPS_bulk!(peps, iPEPS, pattern)
-    for i in 2:size(peps,1)-1
-        for j in 2:size(peps,2)-1
+    for i in 2:size(peps, 1)-1
+        for j in 2:size(peps, 2)-1
             x = pattern[(i-2)%(size(pattern,1))+1, (j-2)%(size(pattern,2))+1]
             write_Tensor!(peps, iPEPS[x], i, j)
         end
     end
 end
 
-# vectors can be either: Array{Vector, 2*size(peps,1) + 2*size(peps,2) + 4} -> will be used subsequently to contract boundary Tensors
+# vectors can be either: Array{Vector, 2*size(peps, 1) + 2*size(peps, 2) + 4} -> will be used subsequently to contract boundary Tensors
 #                        Array{Vector, 4} -> will be used subsequently to contract boundary Tensors. A different Vector will be used for 
 #                                            different contract-direction. 1: left, 2: down, 3: right, 4: up
 #                        :random          -> generates random Vectors for contraction
@@ -373,8 +373,8 @@ function iPEPS_to_fPEPS_boundary!(peps, iPEPS, pattern; vectors=:random)
     isFour = length(vectors)==4
 
     indices = Index.(size(iPEPS[1]))
-    for j in [1,size(peps,2)]
-        for i in 1:size(peps,1)
+    for j in [1,size(peps, 2)]
+        for i in 1:size(peps, 1)
             x = pattern[(i-2+size(pattern,1))%size(pattern,1) + 1, (j-2+size(pattern,2))%size(pattern,2) + 1]
             j == 1 ? y = 1 : y = 3
             if isFour
@@ -382,7 +382,7 @@ function iPEPS_to_fPEPS_boundary!(peps, iPEPS, pattern; vectors=:random)
             else
                 ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(popfirst!(vectors), indices[y])
             end
-            if i == 1 || i == size(peps,1)
+            if i == 1 || i == size(peps, 1)
                 i == 1 ? y = 4 : y = 2
                 if isFour
                     ipeps_ten *= ITensor(vectors[y], indices[y])
@@ -394,8 +394,8 @@ function iPEPS_to_fPEPS_boundary!(peps, iPEPS, pattern; vectors=:random)
         end
     end
 
-    for j in 2:size(peps,2)-1
-        for i in [1, size(peps,1)]
+    for j in 2:size(peps, 2)-1
+        for i in [1, size(peps, 1)]
             x = pattern[(i-2+size(pattern,1))%size(pattern,1) + 1, (j-2+size(pattern,2))%size(pattern,2) + 1]
             i == 1 ? y = 4 : y = 2
             if isFour
@@ -410,7 +410,7 @@ end
 
 function generate_vectors(peps, iPEPS, vector_type)
     if vector_type == :random
-        return [rand(maxbonddim(peps)) for i in 1:2*size(peps,1) + 2*size(peps,2) + 4]
+        return [rand(maxbonddim(peps)) for i in 1:2*size(peps, 1) + 2*size(peps, 2) + 4]
     elseif vector_type == :four
         return [rand(maxbonddim(peps)) for i in 1:4]
     elseif vector_type == :ones

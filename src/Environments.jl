@@ -51,12 +51,12 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environ
         overwrite = false
     end
     
-    env_down = Array{Environment}(undef, size(peps, 1)-1)
+    env_down = Array{Environment}(undef, size(peps, 1) - 1)
 
     peps_projected = get_projected(peps, S)
     
     if overwrite
-        env_top[1] = generate_env_row(peps_projected[1,:], peps.contract_dim; alg, cutoff=peps.contract_cutoff)
+        env_top[1] = generate_env_row(peps_projected[1, :], peps.contract_dim; alg, cutoff=peps.contract_cutoff)
     end
     env_down[1] = generate_env_row(peps_projected[size(peps, 1), :], peps.contract_dim; alg, cutoff=peps.contract_cutoff)
     
@@ -64,15 +64,15 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environ
     for i in 2:size(S,1)-1
         i_prime = size(S,1)+1-i 
         if overwrite
-            env_top[i] = generate_env_row(peps_projected[i,:], peps.contract_dim; env_row_above=env_top[i-1], alg, cutoff=peps.contract_cutoff)
+            env_top[i] = generate_env_row(peps_projected[i, :], peps.contract_dim; env_row_above=env_top[i-1], alg, cutoff=peps.contract_cutoff)
         end
-        env_down[i] = generate_env_row(peps_projected[i_prime,:], peps.contract_dim; env_row_above=env_down[i-1], alg, cutoff=peps.contract_cutoff)
+        env_down[i] = generate_env_row(peps_projected[i_prime, :], peps.contract_dim; env_row_above=env_down[i-1], alg, cutoff=peps.contract_cutoff)
     end
 
     # Check if maximal bond dimension is reached
     max_bond = max(maxlinkdim(env_top), maxlinkdim(env_down))
     if max_bond == peps.contract_dim && peps.show_warning
-        @warn "horizontal environments at maximal bond dimension"
+        @warn "horizontal environments at maximal bond dimension $max_bond"
     end
     
     # once we calculated all environments we calculate <ψ|S> using the environments
@@ -105,17 +105,17 @@ function logψ_exact(peps, sample)
     return log(Complex(con))
 end
 
-function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_horizontal_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps,1), size(peps, 2)-1), all_horizontal_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps,1), size(peps, 2)-1))
-    for i in 1:size(peps,1)
-        view_r = @view all_horizontal_envs_r[i,:]
-        view_l = @view all_horizontal_envs_l[i,:]
+function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_horizontal_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps, 1), size(peps, 2)-1), all_horizontal_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps, 1), size(peps, 2)-1))
+    for i in 1:size(peps, 1)
+        view_r = @view all_horizontal_envs_r[i, :]
+        view_l = @view all_horizontal_envs_l[i, :]
         get_horizontal_envs!(peps, env_top, env_down, S, i, view_r, view_l)
     end
     return all_horizontal_envs_r, all_horizontal_envs_l
 end
 
 function get_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs_r=Matrix{ITensor}(undef, size(peps, 2)-1), horizontal_envs_l=Matrix{ITensor}(undef, size(peps, 2)-1))
-    get_horizontal_envs!(peps, env_top, env_down,S,i,horizontal_envs_r, horizontal_envs_l)
+    get_horizontal_envs!(peps, env_top, env_down, S,i ,horizontal_envs_r, horizontal_envs_l)
     return horizontal_envs_r, horizontal_envs_l
 end
 
@@ -150,10 +150,10 @@ function contract_recursiv!(h_envs, a, b; c=ones(length(a)), d=ones(length(a)), 
     end
 end
 
-function get_all_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_4b_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps,1)-1, size(peps, 2)-1), all_4b_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps,1)-1, size(peps, 2)-1))
-    for i in 1:size(peps,1)-1
-        view_r = @view all_4b_envs_r[i,:]
-        view_l = @view all_4b_envs_l[i,:]
+function get_all_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_4b_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps, 1)-1, size(peps, 2)-1), all_4b_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps, 1)-1, size(peps, 2)-1))
+    for i in 1:size(peps, 1)-1
+        view_r = @view all_4b_envs_r[i, :]
+        view_l = @view all_4b_envs_l[i, :]
         get_4b_envs!(peps, env_top, env_down, S, i, view_r, view_l)
     end
     return all_4b_envs_r, all_4b_envs_l

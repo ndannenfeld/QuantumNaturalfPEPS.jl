@@ -2,32 +2,33 @@ function exp_update(p, t, factor=0.1)
     return factor .* t .+ sqrt(1-factor^2) .* p
 end
 
-function basis_change(peps, ops::Array{ITensor, 2})
+function basis_change!(peps, ops::Array{ITensor, 2})
     peps = deepcopy(peps)
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
         peps.tensors[i, j] = noprime(peps[i, j] * ops[i, j])
     end
     return peps
 end
+basis_change(peps, ops::Array{ITensor, 2}) = basis_change!(deepcopy(peps), ops)
 
-function basis_change(peps, ops::Array{ITensor, 1}, i::Int)
-    peps = deepcopy(peps)
+function basis_change!(peps, ops::Array{ITensor, 1}, i::Int)
     for j in 1:size(peps, 2)
         peps.tensors[i, j] = noprime(peps[i, j] * ops[j])
     end
     return peps
 end
+basis_change(peps, ops::Array{ITensor, 1}, i::Int) = basis_change!(deepcopy(peps), ops, i)
 
-function basis_change(peps; gate="H")
-    peps = deepcopy(peps)
+function basis_change!(peps; gate="H", kwargs...)
     for i in 1:size(peps, 1)
         for j in 1:size(peps, 2)
-            U = op(gate, siteind(peps, i, j))
+            U = op(gate, siteind(peps, i, j); kwargs...)
             peps.tensors[i, j] = noprime(peps[i, j] * U)
         end
     end
     return peps
 end
+basis_change(peps; kwargs...) = basis_change!(deepcopy(peps); kwargs...)
 
 function get_rotator(Ok_Tensor, S; update=exp_update, factor=0.05)
     inds_ = inds(Ok_Tensor)[1]
@@ -136,7 +137,7 @@ end
 function rotate_to_product_state_sweep_down(peps, logψ, env_top, env_down, h_envs_r, h_envs_l; S=zeros(Int, size(peps)...), verbose=false, kwargs...)
     c = 0
     for i in 1:size(peps, 1)
-        view_r = @view h_envs_r[i,:]
+        view_r = @view h_envs_r[i, :]
         view_l = @view h_envs_l[i, :]
         QuantumNaturalfPEPS.get_horizontal_envs!(peps, env_top, env_down, S, i, view_r, view_l)
         h_envs_r, h_envs_l = QuantumNaturalfPEPS.get_all_horizontal_envs(peps, env_top, env_down, S)
@@ -150,10 +151,10 @@ function rotate_to_product_state_sweep_down(peps, logψ, env_top, env_down, h_en
         
         peps_projected = QuantumNaturalfPEPS.get_projected(peps, S)
         if i == 1
-            env_top[1] = QuantumNaturalfPEPS.generate_env_row(peps_projected[1,:], peps.contract_dim; cutoff=peps.contract_cutoff)
+            env_top[1] = QuantumNaturalfPEPS.generate_env_row(peps_projected[1, :], peps.contract_dim; cutoff=peps.contract_cutoff)
             #env_down[end] = QuantumNaturalfPEPS.generate_env_row(peps_projected[size(peps, 1), :], peps.contract_dim; cutoff=peps.contract_cutoff)
         elseif i < size(peps, 1)
-            env_top[i] = QuantumNaturalfPEPS.generate_env_row(peps_projected[i,:], peps.contract_dim; env_row_above=env_top[i-1], cutoff=peps.contract_cutoff)
+            env_top[i] = QuantumNaturalfPEPS.generate_env_row(peps_projected[i, :], peps.contract_dim; env_row_above=env_top[i-1], cutoff=peps.contract_cutoff)
         else
             env_down[1] = QuantumNaturalfPEPS.generate_env_row(peps_projected[size(peps, 1), :], peps.contract_dim; cutoff=peps.contract_cutoff)
         end
@@ -170,7 +171,7 @@ end
 function rotate_to_product_state_sweep_up(peps, logψ, env_top, env_down, h_envs_r, h_envs_l; S=zeros(Int, size(peps)...), verbose=false, kwargs...)
     c = 0
     for i in size(peps, 1):-1:1
-        view_r = @view h_envs_r[i,:]
+        view_r = @view h_envs_r[i, :]
         view_l = @view h_envs_l[i, :]
         QuantumNaturalfPEPS.get_horizontal_envs!(peps, env_top, env_down, S, i, view_r, view_l)
         h_envs_r, h_envs_l = QuantumNaturalfPEPS.get_all_horizontal_envs(peps, env_top, env_down, S)
@@ -187,9 +188,9 @@ function rotate_to_product_state_sweep_up(peps, logψ, env_top, env_down, h_envs
             env_down[1] = QuantumNaturalfPEPS.generate_env_row(peps_projected[size(peps, 1), :], peps.contract_dim; cutoff=peps.contract_cutoff)
         elseif 1 < i
             iprime = size(peps, 1) + 1 - i 
-            env_down[iprime] = QuantumNaturalfPEPS.generate_env_row(peps_projected[i,:], peps.contract_dim; env_row_above=env_down[iprime-1], cutoff=peps.contract_cutoff)
+            env_down[iprime] = QuantumNaturalfPEPS.generate_env_row(peps_projected[i, :], peps.contract_dim; env_row_above=env_down[iprime-1], cutoff=peps.contract_cutoff)
         else
-            env_top[1] = QuantumNaturalfPEPS.generate_env_row(peps_projected[1,:], peps.contract_dim; cutoff=peps.contract_cutoff)
+            env_top[1] = QuantumNaturalfPEPS.generate_env_row(peps_projected[1, :], peps.contract_dim; cutoff=peps.contract_cutoff)
         end
         
         logψ = QuantumNaturalfPEPS.get_logψ(env_top, env_down; pos=max(1, i-1))

@@ -246,7 +246,10 @@ function get_longerHor_term(peps::PEPS, env_top::Vector{Environment}, env_down::
 end
 
 # computes the local energy <sample|H|ψ>/<sample|ψ>
-function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}; fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing, timer=TimerOutput())
+function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, env_down::Vector{Environment},
+                          sample::Matrix{Int64}, logψ::Number;
+                          h_envs_r=nothing, h_envs_l=nothing, fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing,
+                          timer=TimerOutput())
     
     if logψ_flipped === nothing
         logψ_flipped = Dict{Any, Number}()
@@ -263,6 +266,9 @@ function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, e
     # loop through every horizontal components
     @timeit timer "horizontal" for flip_term in horizontal 
         # calculate the Energy contribution of the specific term and add it to the total Ek
+        if h_envs_r === nothing || h_envs_l === nothing
+            @timeit timer "horizontal_envs" h_envs_r, h_envs_l = get_all_horizontal_envs(peps, env_top, env_down, sample)
+        end
         if !haskey(logψ_flipped, flip_term)
             logψ_flipped[flip_term] = get_term(peps, env_top, env_down, sample, flip_term, h_envs_r[flip_term[1][1][1], :], h_envs_l[flip_term[1][1][1], :])
         end
@@ -283,6 +289,9 @@ function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, e
     end
 
     if !isempty(longerHor)
+        if h_envs_r === nothing || h_envs_l === nothing
+            @timeit timer "horizontal_envs" h_envs_r, h_envs_l = get_all_horizontal_envs(peps, env_top, env_down, sample)
+        end
         for flip_term in longerHor 
             if !haskey(logψ_flipped, flip_term)
                 logψ_flipped[flip_term] = get_longerHor_term(peps, env_top, env_down, sample, flip_term, h_envs_r[flip_term[1][1][1], :], h_envs_l[flip_term[1][1][1], :])
@@ -316,16 +325,15 @@ end
 function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, sample; env_top=Array{Environment}(undef, size(S,1)-1), kwargs...)
     # get the environment tensors
     logψ, env_top, env_down = get_logψ_and_envs(peps, sample, env_top) # compute the environments of the peps according to that sample
-    h_envs_r, h_envs_l = get_all_horizontal_envs(peps, env_top, env_down, sample) # computes the horizontal environments of the already sampled peps
-    return get_Ek(peps, ham_op, env_top, env_down, sample, logψ, h_envs_r, h_envs_l; kwargs...)
+    return get_Ek(peps, ham_op, env_top, env_down, sample, logψ; kwargs...)
 end
 
 
-function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number, h_envs_r::Array{ITensor}, h_envs_l::Array{ITensor}; fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing, Ek_terms=nothing, kwargs...)
+function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number; h_envs_r=nothing, h_envs_l=nothing, fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing, Ek_terms=nothing, kwargs...)
     if Ek_terms === nothing
         Ek_terms = QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, sample; get_flip_sites=true)
     end
-    logψ_flipped = get_logψ_flipped(peps, Ek_terms, env_top, env_down, sample, logψ, h_envs_r, h_envs_l; fourb_envs_r, fourb_envs_l, logψ_flipped, kwargs...)
+    logψ_flipped = get_logψ_flipped(peps, Ek_terms, env_top, env_down, sample, logψ; h_envs_r, h_envs_l, fourb_envs_r, fourb_envs_l, logψ_flipped, kwargs...)
     
     Ek = 0
     for flip_term in keys(Ek_terms)

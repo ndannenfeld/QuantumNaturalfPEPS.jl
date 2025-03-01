@@ -59,8 +59,8 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
 
     E_mpo = bra.*ket
     
-    E_mpo = E_mpo.*C[1,:]
-    E_mpo = E_mpo.*C[2,:]
+    E_mpo = E_mpo.*C[1, :]
+    E_mpo = E_mpo.*C[2, :]
 
     E_mps = contract(E_mpo, peps_double_env.env; maxdim, cutoff)
 
