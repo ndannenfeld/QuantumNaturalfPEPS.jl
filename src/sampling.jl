@@ -85,10 +85,10 @@ end
 # calculates the bra and the ket layer and applies (if available) already sampled rows (from above)
 function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
     bra = conj(MPO(peps[row, :]))
-    ket = copy(MPO(peps[row, :]))
+    ket = copy(MPO(peps[row, :])) # TODO: Why copy here?
 
     if row != 1   
-        bra = contract(bra, (env_top[row-1].env); maxdim=peps.sample_dim, cutoff=peps.sample_cutoff)
+        bra = contract(bra, (env_top[row-1].env); maxdim=peps.sample_dim, cutoff=peps.sample_cutoff) # TODO: Why are you doing the same operation twice?
         ket = contract(ket, conj(env_top[row-1].env); maxdim=peps.sample_dim, cutoff=peps.sample_cutoff)
     end
 
@@ -127,9 +127,9 @@ function calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
     end
 end
 
-# returns the 2x2 matrix ρ_r which is needed to sample from. Also updates sigma (used to store the contraction of already sampled sites from the left edge to the current site)
+# returns the phys_dimxphys_sim matrix ρ_r which is needed to sample from. Also updates sigma (used to store the contraction of already sampled sites from the left edge to the current site)
 function get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
-    ket[i] = delta(siteind(peps,row,i), Index(2, "ket_phys"))*ket[i]
+    ket[i] = delta(siteind(peps,row,i), Index(2, "ket_phys"))*ket[i] # TODO: Fix this for compatibility with phys_dim!=2, using siteinds(peps, i, j)' would be better
    
     if row != size(peps, 1)
         com_inds = commoninds(peps[row,i], peps[row+1,i])
@@ -225,7 +225,8 @@ function get_sample(peps::PEPS)
         end
         
         # the sampled bra is used to generate the top environments
-        bra = bra.*[ITensor([(S[row,i]+1)%2, S[row,i]], siteind(peps, row, i)) for i in 1:size(peps, 2)]
+        bra = bra .* [ITensor([(S[row,i]+1)%2, S[row,i]], siteind(peps, row, i)) for i in 1:size(peps, 2)] # TODO: Fix this for compatibility with phys_dim!=2
+        # TODO: Should we be recalculating the top environment here? We should see if we can avoid this
         if row != size(peps, 1) 
             if row == 1
                 env_top[row] = Environment(MPS(bra.data); normalize=true)
