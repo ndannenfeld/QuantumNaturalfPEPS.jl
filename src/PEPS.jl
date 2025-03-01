@@ -113,15 +113,23 @@ end
 function write!(peps::PEPS, θ::Vector{T}; reset_double_layer=true, mask=peps.mask) where T# Writes the vector θ into the tensors.
     @assert eltype(peps) == T "The type of the PEPS is $(eltype(peps)) and the type of the vector θ is $T. They must be the same type."
     pos = 1
-    for i in 1:size(peps, 1)
-        for j in 1:size(peps, 2)
-            if mask[i,j] != 0
-                shift = prod(dim.(inds(peps[i,j])))
-                peps[i, j][:] = reshape(θ[pos:(pos+shift-1)], dim.(inds(peps[i,j])))
-                pos += shift
+    for i in 1:size(peps, 1), j in 1:size(peps, 2)
+        if mask[i,j] != 0
+            shift = prod(dim.(inds(peps[i,j])))
+            θi = @view θ[pos:(pos+shift-1)]
+            pos += shift
+
+            # If peps is not in the right order define new tensor
+            if inds(peps[i,j])[1] != siteind(peps, i, j) || inds(peps[i,j])[2:end] != linkinds(peps, i, j)
+                peps[i, j] = ITensor(θi, (siteind(peps, i, j), linkinds(peps, i, j)...))
+            
+            else # If in the right order, copy the values
+                peps[i, j][:] = reshape(θi, dim.(inds(peps[i,j])))
             end
+            
         end
     end
+
     if reset_double_layer
         peps.double_layer_envs = nothing
     end
