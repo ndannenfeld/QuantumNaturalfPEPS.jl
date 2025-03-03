@@ -44,11 +44,12 @@ end
 
 # Computes the environments and log(<ψ|S>)
 function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environment}(undef, size(S,1)-1);
-                           alg="densitymatrix", kwargs...)
+                           alg="densitymatrix", overwrite=nothing, kwargs...)
     
-    overwrite = true    # if env_top is given and the bond dimension is sufficient, we do not need to calculate it again
-    if isassigned(env_top, 1) && maxlinkdim(env_top[1].env) >= peps.contract_dim
-        overwrite = false
+    Lx = size(peps, 1)
+    if overwrite === nothing
+        # if env_top is given and the bond dimension is sufficient, we do not need to calculate it again
+        overwrite = !(isassigned(env_top, Lx-1) && maxlinkdim(env_top[Lx-1].env) >= peps.contract_dim)   
     end
     
     env_down = Array{Environment}(undef, size(peps, 1) - 1)
@@ -58,11 +59,11 @@ function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environ
     if overwrite
         env_top[1] = generate_env_row(peps_projected[1, :], peps.contract_dim; alg, cutoff=peps.contract_cutoff)
     end
-    env_down[1] = generate_env_row(peps_projected[size(peps, 1), :], peps.contract_dim; alg, cutoff=peps.contract_cutoff)
+    env_down[1] = generate_env_row(peps_projected[Lx, :], peps.contract_dim; alg, cutoff=peps.contract_cutoff)
     
     # for every row we calculate the environments once from the top down and once from the bottom up
-    for i in 2:size(S,1)-1
-        i_prime = size(S,1)+1-i 
+    for i in 2:Lx-1
+        i_prime = Lx+1-i 
         if overwrite
             env_top[i] = generate_env_row(peps_projected[i, :], peps.contract_dim; env_row_above=env_top[i-1], alg, cutoff=peps.contract_cutoff)
         end
@@ -105,7 +106,9 @@ function logψ_exact(peps, sample)
     return log(Complex(con))
 end
 
-function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_horizontal_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps, 1), size(peps, 2)-1), all_horizontal_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps, 1), size(peps, 2)-1))
+function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64},
+                                 all_horizontal_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps, 1), size(peps, 2)-1),
+                                 all_horizontal_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps, 1), size(peps, 2)-1))
     for i in 1:size(peps, 1)
         view_r = @view all_horizontal_envs_r[i, :]
         view_l = @view all_horizontal_envs_l[i, :]

@@ -1,20 +1,20 @@
 # renames the indices changing_inds to new ones and stores them in indices_outer
 function rename_indices!(ket, indices_outer, changing_inds)
-    for i in 1:length(indices_outer)
-        indices_outer[i] = Index(dim(changing_inds[i]), "Ket_$(i)")
+    for j in 1:length(indices_outer)
+        indices_outer[j] = Index(dim(changing_inds[j]), "Ket_$(j)")
         
-        ket[i] = subsinds(ket[i], changing_inds[i], indices_outer[i])
+        ket[j] = subsinds(ket[j], changing_inds[j], indices_outer[j])
     end  
 end
 
 # renames all inner indices in a MPO/MPS
 function rename_indices!(ket)
-    for i in 1:length(ket)-1
-        old_ind = commoninds(ket[i], ket[i+1])[1]
-        new_ind = Index(dim(old_ind), "Ket_inner_$(i)")
+    for j in 1:length(ket)-1
+        old_ind = commoninds(ket[j], ket[j+1])[1]
+        new_ind = Index(dim(old_ind), "Ket_inner_$(j)")
 
-        ket[i] = subsinds(ket[i], old_ind, new_ind)
-        ket[i+1] = subsinds(ket[i+1], old_ind, new_ind)
+        ket[j] = subsinds(ket[j], old_ind, new_ind)
+        ket[j+1] = subsinds(ket[j+1], old_ind, new_ind)
     end
 end
 
@@ -45,14 +45,14 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
     
     com_inds = commoninds.(peps_row, peps_row_above)
     rename_indices!(ket, indices_outer, vcat(com_inds...))
-    for i in 1:length(peps_row)
-        C[1,i] = combiner(indices_outer[i], com_inds[i], tags="up")
+    for j in 1:length(peps_row)
+        C[1,j] = combiner(indices_outer[j], com_inds[j], tags="up")
     end
 
     com_inds = commoninds.(peps_row, peps_row_below)
     rename_indices!(ket, indices_outer, vcat(com_inds...))
-    for i in 1:length(peps_row)
-        C[2,i] = combiner_tar(indices_outer[i], com_inds[i]; target_ind=reduce(vcat, inds(peps_double_env.env[i], "up")), tags="down")
+    for j in 1:length(peps_row)
+        C[2,j] = combiner_tar(indices_outer[j], com_inds[j]; target_ind=reduce(vcat, inds(peps_double_env.env[j], "up")), tags="down")
     end
 
     rename_indices!(ket)
@@ -83,73 +83,76 @@ function generate_double_layer_envs(peps::PEPS)
 end
 
 # calculates the bra and the ket layer and applies (if available) already sampled rows (from above)
-function get_bra_ket!(peps, row, indices_outer, env_top=nothing)
-    bra = conj(MPO(peps[row, :]))
-    ket = copy(MPO(peps[row, :])) # TODO: Why copy here?
+function get_bra_ket(peps, i, indices_outer, env_top=nothing)
+    #ket = copy(MPO(peps[i, :])) # TODO: Why copy here?
+    #bra = conj(MPO(peps[i, :]))
 
-    if row != 1   
-        bra = contract(bra, (env_top[row-1].env); maxdim=peps.sample_dim, cutoff=peps.sample_cutoff) # TODO: Why are you doing the same operation twice?
-        ket = contract(ket, conj(env_top[row-1].env); maxdim=peps.sample_dim, cutoff=peps.sample_cutoff)
+    ket = MPO(peps[i, :])
+    if i != 1   
+        ket = contract(ket, env_top[i-1].env; maxdim=peps.sample_dim, cutoff=peps.sample_cutoff)
+        #bra = contract(bra, conj(env_top[i-1].env); maxdim=peps.sample_dim, cutoff=peps.sample_cutoff) # TODO: Why are you doing the same operation twice?
     end
+    bra = conj(ket)
 
-    rename_indices!(ket)
+    rename_indices!(ket) # TODO: Avoid indices renaming by using primelevels prime!(ket), like this is very confusing
     
-    if row != size(peps, 1)
-        rename_indices!(ket, indices_outer, vcat(commoninds.(peps[row, :], peps[row+1, :])...))
+    if i != size(peps, 1)
+        rename_indices!(ket, indices_outer, vcat(commoninds.(peps[i, :], peps[i+1, :])...))
     end
     return bra, ket
 end
 
 # calculates the unsampled contractions along a row (from right to left the sites are contracted along the physical Index)
-function calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
-    if row != size(peps, 1)
-        com_inds = commoninds(peps[row,size(peps, 2)], peps[row+1,size(peps, 2)])
-        combined_indx = inds(peps.double_layer_envs[row].env[end], "up")[1]
+function calculate_unsampled_Env_row!(bra, ket, peps, i, E, indices_outer)
+    if i != size(peps, 1)
+        com_inds = commoninds(peps[i,size(peps, 2)], peps[i+1,size(peps, 2)])
+        combined_indx = inds(peps.double_layer_envs[i].env[end], "up")[1]
         C = combiner_tar(indices_outer[end], com_inds; target_ind=combined_indx)
 
-        E[end] = peps.double_layer_envs[row].env[end]*C*bra[end]*ket[end]
-        for i in size(peps, 2)-1:-1:2
-            com_inds = commoninds(peps[row,i], peps[row+1,i])
-            combined_indx = inds(peps.double_layer_envs[row].env[i], "up")[1]
-            C = combiner_tar(indices_outer[i], com_inds; target_ind=combined_indx)
+        E[end] = peps.double_layer_envs[i].env[end]*C*bra[end]*ket[end]
+        for j in size(peps, 2)-1:-1:2
+            com_inds = commoninds(peps[i,j], peps[i+1,j])
+            combined_indx = inds(peps.double_layer_envs[i].env[j], "up")[1]
+            C = combiner_tar(indices_outer[j], com_inds; target_ind=combined_indx)
 
-            uncombined_double_layer = peps.double_layer_envs[row].env[i] * C
-            E[i-1] = E[i] * ket[i]
-            E[i-1] *= uncombined_double_layer
-            E[i-1] *= bra[i]
+            uncombined_double_layer = peps.double_layer_envs[i].env[j] * C
+            E[j-1] = E[j] * ket[j]
+            E[j-1] *= uncombined_double_layer
+            E[j-1] *= bra[j]
         end
     else
         E[end] = bra[end]*ket[end]
-        for i in size(peps, 2)-1:-1:2
-            E[i-1] = ket[i]*E[i]
-            E[i-1] *= bra[i]
+        for j in size(peps, 2)-1:-1:2
+            E[j-1] = ket[j]*E[j]
+            E[j-1] *= bra[j]
         end
     end
 end
 
 # returns the phys_dimxphys_sim matrix ρ_r which is needed to sample from. Also updates sigma (used to store the contraction of already sampled sites from the left edge to the current site)
-function get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
-    ket[i] = delta(siteind(peps,row,i), Index(2, "ket_phys"))*ket[i] # TODO: Fix this for compatibility with phys_dim!=2, using siteinds(peps, i, j)' would be better
+function get_reduced_ρ(bra, ket, peps, i, j, E, indices_outer, sigma)
+    ket[j] = prime(ket[j], siteind(peps, i, j))
+    #ket[j] = delta(siteind(peps, i, j), Index(2, "ket_phys"))*ket[j] # TODO: Fix this for compatibility with phys_dim!=2, using siteinds(peps, j, j)' would be better
    
-    if row != size(peps, 1)
-        com_inds = commoninds(peps[row,i], peps[row+1,i])
-        C = combiner_tar(indices_outer[i], com_inds; target_ind=inds(peps.double_layer_envs[row].env[i], "up")[1])
+    if i != size(peps, 1)
+        com_inds = commoninds(peps[i,j], peps[i+1,j])
+        C = combiner_tar(indices_outer[j], com_inds; target_ind=inds(peps.double_layer_envs[i].env[j], "up")[1])
         
-        uncombined_double_layer = peps.double_layer_envs[row].env[i]*C
-        sigma *= ket[i]
+        uncombined_double_layer = peps.double_layer_envs[i].env[j]*C
+        sigma *= ket[j]
         sigma *= uncombined_double_layer
-        sigma *= bra[i]
+        sigma *= bra[j]
     else
-        sigma *= ket[i]
-        sigma *= bra[i]
+        sigma *= ket[j]
+        sigma *= bra[j]
     end
 
-    if i == 1
-        ρ_r = E[i]*sigma
-    elseif i == size(peps, 2)
+    if j == 1
+        ρ_r = E[j]*sigma
+    elseif j == size(peps, 2)
         ρ_r = sigma
     else
-        ρ_r = sigma*E[i]
+        ρ_r = sigma*E[j]
     end 
     
     return ρ_r, sigma
@@ -183,14 +186,8 @@ function sample_p(probs::Vector{T}; normalize=true) where T<:Real
     error("probs is not normalized sum(probs)=$(sum(probs))")
 end
 
-# after the sampling of the current site, it is fixed and its contraction with the aleady sampled sites is stored in sigma
-function update_sigma(peps, sigma, S, i, row, norm_factor)
-    s = sigma* get_projector(S, siteind(peps, row, i))*get_projector(S, inds(sigma, "ket_phys")[1])#ITensor([(S+1)%2, S], inds(sigma, "ket_phys"))
-    return (s) / norm_factor
-end
-
 # generates a sample of a given peps along with pc and the top environments
-function get_sample(peps::PEPS)
+function get_sample(peps::PEPS; mode::Symbol=:full, alg="densitymatrix")
     S = Array{Int64}(undef, size(peps))
     
     indices_outer = Array{Index}(undef, size(peps, 2))
@@ -203,37 +200,51 @@ function get_sample(peps::PEPS)
     
     logpc = 0
     # we loop through every row
-    for row in 1:size(peps, 1)
+    for i in 1:size(peps, 1)
         sigma = 1
-        bra, ket = get_bra_ket!(peps, row, indices_outer, env_top)
+        bra, ket = get_bra_ket(peps, i, indices_outer, env_top)
         
         # we then calculate the unsampled environment (in one row)
-        calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
+        calculate_unsampled_Env_row!(bra, ket, peps, i, E, indices_outer)
 
         # then we loop through the different sites in one row
-        for i in 1:size(peps, 2)
+        for j in 1:size(peps, 2)
             
-            # calculate the 2x2 matrix from which we sample
-            ρ_r, sigma = get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
+            # calculate the phys_dimxphys_dim matrix from which we sample
+            ρ_r, sigma = get_reduced_ρ(bra, ket, peps, i, j, E, indices_outer, sigma)
             
             # sample from ρ_r
-            S[row, i], pc = sample_ρr(ρ_r)
+            S[i, j], pc = sample_ρr(ρ_r)
             logpc += log(pc)
             
-            # store the contraction of sampled sites in sigma
-            sigma = update_sigma(peps, sigma, S[row, i], i, row, pc)                        
+            # after the sampling of the current site, it is fixed and its contraction with the aleady sampled sites is stored in sigma
+            site = siteind(peps, i, j)
+            sigma *= get_projector(S[i, j], site)
+            sigma *= get_projector(S[i, j], site')
+            sigma /= pc                  
         end
         
-        # the sampled bra is used to generate the top environments
-        bra = bra .* [ITensor([(S[row,i]+1)%2, S[row,i]], siteind(peps, row, i)) for i in 1:size(peps, 2)] # TODO: Fix this for compatibility with phys_dim!=2
-        # TODO: Should we be recalculating the top environment here? We should see if we can avoid this
-        if row != size(peps, 1) 
-            if row == 1
-                env_top[row] = Environment(MPS(bra.data); normalize=true)
-            else
-                env_top[row] = Environment(MPS(bra.data), env_top[row-1].f; normalize=true)
+        if mode === :fast
+            # the sampled bra is used to generate the top environments
+            ket = conj(bra) .* [get_projector(S[i, j], siteind(peps, i, j)) for j in 1:size(peps, 2)]
+            if i == 1
+                env_top[i] = Environment(MPS(ket.data); normalize=true)
+            elseif i != size(peps, 1) 
+                env_top[i] = Environment(MPS(ket.data), env_top[i-1].f; normalize=true)
             end
+
+        elseif mode === :full
+             # TODO: Should we be recalculating the top environment here? Is it slower?
+            if i == 1
+                peps_projected_1 = get_projected(peps, S, 1, :)
+                env_top[1] = generate_env_row(peps_projected_1, peps.contract_dim; alg, cutoff=peps.contract_cutoff)
+            elseif i != size(peps, 1) 
+                peps_projected_row = get_projected(peps, S, i, :)
+                env_top[i] = generate_env_row(peps_projected_row, peps.contract_dim; env_row_above=env_top[i-1], alg, cutoff=peps.contract_cutoff)
+            end  
         end
+        
+       
     end
     
     return S, logpc, env_top
