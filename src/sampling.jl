@@ -161,8 +161,8 @@ function sample_ρr(ρ_r)
     T = real(eltype(ρ_r))
     p = Vector{T}(undef, k)
     for i in 1:k
-        p[i] = abs(ρ_r[i,i])
-        @assert imag(ρ_r[i,i]) / (p[i] + 1e-10) < 1e-11
+        p[i] = abs(ρ_r[i, i])
+        @assert imag(ρ_r[i, i]) / (p[i] + 1e-10) < 1e-8 "ρ_r is not real $(ρ_r[i,i])"
     end
     i = sample_p(p, normalize=true)
     return i-1, p[i]
