@@ -22,7 +22,7 @@ otherinds(ket, siteinds_) = setdiff(allindices(ket), siteinds_)
 
 # calculates a double layer environment row by contracting a peps_row with itself along the physical indices
 # also combines the outgoing indices of the double layer
-function generate_double_layer_env_row(peps_row, sites, maxdim; cutoff=1e-13)
+function generate_double_layer_env_row(peps_row, peps_row_above, maxdim; cutoff=1e-13)
     indices_outer = Array{Index}(undef, length(peps_row))
     
     bra = conj(MPO(peps_row))
