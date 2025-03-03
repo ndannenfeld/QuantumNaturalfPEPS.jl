@@ -17,15 +17,19 @@ function rename_indices!(ket)
         ket[j+1] = subsinds(ket[j+1], old_ind, new_ind)
     end
 end
+allindices(ket) = unique(Iterators.flatten(inds.(ket)))
+otherinds(ket, siteinds_) = setdiff(allindices(ket), siteinds_)
 
 # calculates a double layer environment row by contracting a peps_row with itself along the physical indices
 # also combines the outgoing indices of the double layer
-function generate_double_layer_env_row(peps_row, peps_row_above, maxdim; cutoff=1e-13)
+function generate_double_layer_env_row(peps_row, sites, maxdim; cutoff=1e-13)
     indices_outer = Array{Index}(undef, length(peps_row))
     
     bra = conj(MPO(peps_row))
     ket = copy(MPO(peps_row))
-     
+    
+    #links = otherinds(ket, siteinds(peps, i, :))
+    # prime!(links, ket) # TODO do something like this
     rename_indices!(ket)
     com_inds = commoninds.(peps_row, peps_row_above)
     rename_indices!(ket, indices_outer, vcat(com_inds...))
@@ -41,7 +45,7 @@ function generate_double_layer_env_row(peps_row, peps_row_above, peps_row_below,
     indices_outer = Array{Index}(undef, length(peps_row))
 
     bra = conj(MPO(peps_row))
-    ket = copy(MPO(peps_row))
+    ket = copy(MPO(peps_row)) # TODO: Why copy here?
     
     com_inds = commoninds.(peps_row, peps_row_above)
     rename_indices!(ket, indices_outer, vcat(com_inds...))
@@ -73,10 +77,11 @@ function update_double_layer_envs!(peps::PEPS)
 end
 
 function generate_double_layer_envs(peps::PEPS)
-    double_layer_envs = Vector{Environment}(undef, size(peps, 1) - 1)
+    Lx = size(peps, 1)
+    double_layer_envs = Vector{Environment}(undef, Lx - 1)
     # for every row we calculate the double layer environment
-    double_layer_envs[end] = generate_double_layer_env_row(peps[size(peps, 1), :], peps[size(peps, 1)-1, :], peps.double_contract_dim; cutoff=peps.double_contract_cutoff)
-    for i in size(peps, 1)-1:-1:2
+    double_layer_envs[end] = generate_double_layer_env_row(peps[Lx, :], peps[Lx-1, :], peps.double_contract_dim; cutoff=peps.double_contract_cutoff)
+    for i in Lx-1:-1:2
         double_layer_envs[i-1] = generate_double_layer_env_row(peps[i, :], peps[i-1, :], peps[i+1, :], double_layer_envs[i], peps.double_contract_dim; cutoff=peps.double_contract_cutoff)
     end
     return double_layer_envs
