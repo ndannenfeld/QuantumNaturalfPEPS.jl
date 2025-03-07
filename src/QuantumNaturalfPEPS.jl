@@ -6,6 +6,7 @@ using Random
 using LogExpFunctions
 
 using Distributed
+using SharedArrays
 using MPI
 
 using LinearAlgebra
@@ -23,8 +24,6 @@ include("sampling.jl")
 include("Ok.jl")
 include("Ek.jl")
 include("Ok_and_Ek.jl")
-include("Oks_and_Eks.jl")
-include("Eks.jl")
 include("Observables.jl")
 include("Hamiltonians.jl")
 
