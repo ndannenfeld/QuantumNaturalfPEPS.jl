@@ -21,6 +21,30 @@ mutable struct PEPS
     end
 end
 
+function PEPS(::Type{S}, peps::PEPS) where {S<:Number}
+    tensors = convert_eltype.(S, peps.tensors)
+    if peps.double_layer_envs === nothing
+        double_layer_envs = nothing
+    else
+        double_layer_envs = Environment.(S, peps.double_layer_envs)
+    end
+    new_peps = PEPS(
+        tensors,
+        peps.bond_dim;
+        sample_dim           = peps.sample_dim,
+        sample_cutoff        = peps.sample_cutoff,
+        contract_dim         = peps.contract_dim,
+        contract_cutoff      = peps.contract_cutoff,
+        double_contract_dim  = peps.double_contract_dim,
+        double_contract_cutoff = peps.double_contract_cutoff,
+        shift                = false,
+        show_warning         = peps.show_warning,
+        mask                 = peps.mask
+    )
+    new_peps.double_layer_envs = double_layer_envs
+    return new_peps
+end
+
 maxbonddim(peps::PEPS) = peps.bond_dim
 
 Base.size(peps::PEPS, args...) = size(peps.tensors, args...)
@@ -146,7 +170,7 @@ function PEPS(::Type{S}, type, Lx::Int64, Ly::Int64; kwargs...) where {S<:Number
 end
 
 PEPS(hilbert::Matrix{Index{Int64}}; kwargs...) = PEPS(Float64, hilbert; kwargs...)
-
+PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; kwargs...) where {S<:Number} = PEPS(S, hilbert; kwargs...)
 
 """
     PEPS(S, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, shift=true, kwargs...) where {S<:Number}
