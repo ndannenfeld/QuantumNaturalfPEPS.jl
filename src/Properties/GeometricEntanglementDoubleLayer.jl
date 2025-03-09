@@ -16,7 +16,7 @@ function get_largest_eigenvec(ρ_r::ITensor; norm=false)
     prod_tensor = vec * onehot(inds(val)[2] => ind_)
     return max_val, prod_tensor
 end
-function geometric_entanglement_doublelayer(peps::PEPS; S=zeros(Int, size(peps)...))
+function geometric_entanglement_doublelayer(peps::AbstractPEPS; S=zeros(Int, size(peps)...))
     indices_outer = Array{Index}(undef, size(peps, 2))
     E = Array{ITensor}(undef, size(peps, 2)-1)
     

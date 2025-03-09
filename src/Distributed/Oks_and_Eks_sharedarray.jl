@@ -1,4 +1,4 @@
-function generate_Oks_and_Eks_multiproc_sharedarrays(peps::PEPS, ham_op::TensorOperatorSum; 
+function generate_Oks_and_Eks_multiproc_sharedarrays(peps::AbstractPEPS, ham_op::TensorOperatorSum; 
                                                      timer=TimerOutput(), threaded=true, double_layer_update=update_double_layer_envs!,
                                                      kwargs...)
     n_threads = Distributed.remotecall_fetch(()->Threads.nthreads(), workers()[1])

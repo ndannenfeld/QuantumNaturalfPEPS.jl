@@ -18,7 +18,7 @@ function generate_double_layer_env_row(peps_row, sites, peps_double_env, maxdim;
     return Environment(E_mps, peps_double_env.f; normalize=true)
 end
 
-function generate_double_layer_envs(peps::PEPS)
+function generate_double_layer_envs(peps::AbstractPEPS)
     Lx = size(peps, 1)
     
     maxdim = peps.double_contract_dim
@@ -36,7 +36,7 @@ function generate_double_layer_envs(peps::PEPS)
 end
 
 # adds the double layer environments to the PEPS
-function update_double_layer_envs!(peps::PEPS)
+function update_double_layer_envs!(peps::AbstractPEPS)
     peps.double_layer_envs = generate_double_layer_envs(peps) 
 end
 
@@ -124,7 +124,7 @@ function sample_p(probs::Vector{T}; normalize=true) where T<:Real
 end
 
 # generates a sample of a given peps along with pc and the top environments
-function get_sample(peps::PEPS; mode::Symbol=:full, alg="densitymatrix")
+function get_sample(peps::AbstractPEPS; mode::Symbol=:full, alg="densitymatrix")
     S = Array{Int64}(undef, size(peps))
     
     env_top = Array{Environment}(undef, size(peps, 1)-1)

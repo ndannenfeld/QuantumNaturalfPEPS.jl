@@ -1,8 +1,8 @@
-function dumb_hash(peps::PEPS)
+function dumb_hash(peps::AbstractPEPS)
     return mean(norm.(peps.tensors))
 end
 
-function generate_async_double_layer_envs(peps_::PEPS; verbose=false)
+function generate_async_double_layer_envs(peps_::AbstractPEPS; verbose=false)
     peps = peps_
     slock = Threads.ReentrantLock()
     
@@ -10,7 +10,7 @@ function generate_async_double_layer_envs(peps_::PEPS; verbose=false)
     double_layer_envs = peps.double_layer_envs
     run_flag = Threads.Atomic{Bool}(true)
 
-    function double_layer_update(peps_::PEPS)
+    function double_layer_update(peps_::AbstractPEPS)
         lock(slock)
         peps = peps_
         peps.double_layer_envs = copy(double_layer_envs)

@@ -1,5 +1,5 @@
 # calculates the gradient: d(<ψ|S>)/d(Θ) / <ψ|S>
-function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, logψ::Number;
+function get_Ok(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, logψ::Number;
                 h_envs_r=nothing, h_envs_l=nothing, Ok=nothing, mask=peps.mask)
     if Ok === nothing
         Ok = Vector{eltype(peps)}(undef, length(peps))
@@ -61,7 +61,7 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
     return Ok
 end
 
-function numerical_Ok(peps::PEPS, S::Matrix{Int64}, direction, logψ; dt=0.01)
+function numerical_Ok(peps::AbstractPEPS, S::Matrix{Int64}, direction, logψ; dt=0.01)
     p2 = deepcopy(peps)
     θ = flatten(peps)
     f = 0

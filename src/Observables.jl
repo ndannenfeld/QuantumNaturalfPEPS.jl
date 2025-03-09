@@ -1,4 +1,4 @@
-function get_ExpectationValue(peps::PEPS, O; it=100, threaded=false, multiproc=false)
+function get_ExpectationValue(peps::AbstractPEPS, O; it=100, threaded=false, multiproc=false)
     hilbert = siteinds(peps)
     if !(O isa Vector)
         O = [O]

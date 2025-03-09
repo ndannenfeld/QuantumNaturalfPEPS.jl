@@ -47,7 +47,7 @@ function normalize!(env::Environment)
 end
 
 # Computes the environments and log(<ψ|S>)
-function get_logψ_and_envs(peps::PEPS, S::Array{Int64,2}, env_top=Array{Environment}(undef, size(S,1)-1);
+function get_logψ_and_envs(peps::AbstractPEPS, S::Array{Int64,2}, env_top=Array{Environment}(undef, size(S,1)-1);
                            alg="densitymatrix", overwrite=nothing, kwargs...)
     
     Lx = size(peps, 1)
@@ -110,7 +110,7 @@ function logψ_exact(peps, sample)
     return log(Complex(con))
 end
 
-function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64},
+function get_all_horizontal_envs(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64},
                                  all_horizontal_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps, 1), size(peps, 2)-1),
                                  all_horizontal_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps, 1), size(peps, 2)-1))
     for i in 1:size(peps, 1)
@@ -121,13 +121,13 @@ function get_all_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_d
     return all_horizontal_envs_r, all_horizontal_envs_l
 end
 
-function get_horizontal_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs_r=Matrix{ITensor}(undef, size(peps, 2)-1), horizontal_envs_l=Matrix{ITensor}(undef, size(peps, 2)-1))
+function get_horizontal_envs(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs_r=Matrix{ITensor}(undef, size(peps, 2)-1), horizontal_envs_l=Matrix{ITensor}(undef, size(peps, 2)-1))
     get_horizontal_envs!(peps, env_top, env_down, S,i ,horizontal_envs_r, horizontal_envs_l)
     return horizontal_envs_r, horizontal_envs_l
 end
 
 # this function computes the horizontal environments for a given row
-function get_horizontal_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs_r, horizontal_envs_l)
+function get_horizontal_envs!(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, horizontal_envs_r, horizontal_envs_l)
     peps_i = get_projected(peps, S, i, :)    #contract the row with S
     
     # now we loop through every site and compute the environments (once from the right and once from the left) by MPO-MPS contraction.
@@ -157,7 +157,7 @@ function contract_recursiv!(h_envs, a, b; c=ones(length(a)), d=ones(length(a)), 
     end
 end
 
-function get_all_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_4b_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps, 1)-1, size(peps, 2)-1), all_4b_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps, 1)-1, size(peps, 2)-1))
+function get_all_4b_envs(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, all_4b_envs_r::Array{ITensor}=Array{ITensor}(undef, size(peps, 1)-1, size(peps, 2)-1), all_4b_envs_l::Array{ITensor}=Array{ITensor}(undef, size(peps, 1)-1, size(peps, 2)-1))
     for i in 1:size(peps, 1)-1
         view_r = @view all_4b_envs_r[i, :]
         view_l = @view all_4b_envs_l[i, :]
@@ -166,12 +166,12 @@ function get_all_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vec
     return all_4b_envs_r, all_4b_envs_l
 end
 
-function get_4b_envs(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs_r=Matrix{ITensor}(undef, size(peps, 2)-1), fourb_envs_l=Matrix{ITensor}(undef, size(peps, 2)-1))
+function get_4b_envs(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs_r=Matrix{ITensor}(undef, size(peps, 2)-1), fourb_envs_l=Matrix{ITensor}(undef, size(peps, 2)-1))
     get_4b_envs!(peps, env_top, env_down,S,i,fourb_envs_r, fourb_envs_l)
     return fourb_envs
 end
 
-function get_4b_envs!(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs_r, fourb_envs_l)
+function get_4b_envs!(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, i::Int64, fourb_envs_r, fourb_envs_l)
     peps_i = get_projected(peps, S, i, :)  
     peps_j = get_projected(peps, S, i+1, :)
 

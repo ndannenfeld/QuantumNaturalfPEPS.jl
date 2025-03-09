@@ -5,13 +5,13 @@ function compute_importance_weights(logψs, logpcs)
     return exp.(log_ratios .- logZ)
 end
 
-function generate_Oks_and_Eks(peps::PEPS, ham::OpSum; kwargs...)
+function generate_Oks_and_Eks(peps::AbstractPEPS, ham::OpSum; kwargs...)
     hilbert = siteinds(peps)
     ham_op = TensorOperatorSum(ham, hilbert)
     return generate_Oks_and_Eks(peps, ham_op; kwargs...)
 end
 
-function generate_Oks_and_Eks(peps::PEPS, ham_op::TensorOperatorSum; 
+function generate_Oks_and_Eks(peps::AbstractPEPS, ham_op::TensorOperatorSum; 
                               threaded=false, multiproc=false, shared_array=true, async_double_layers=false, verbose=false,
                               kwargs...)
     
@@ -46,7 +46,7 @@ end
 
 ###### Single threaded
 # this function returns a Ok_and_Eks function wich can be used to optimise via QNG.evolve
-function generate_Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum;
+function generate_Oks_and_Eks_singlethread(peps::AbstractPEPS, ham_op::TensorOperatorSum;
                                            timer=TimerOutput(), double_layer_update=update_double_layer_envs!,
                                            kwargs...)
     function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer; kwargs2...) where T
@@ -63,7 +63,7 @@ function generate_Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum
 end
 
 # The central function is Oks and Eks
-function Oks_and_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum, sample_nr::Integer; timer=TimerOutput(), kwargs...)
+function Oks_and_Eks_singlethread(peps::AbstractPEPS, ham_op::TensorOperatorSum, sample_nr::Integer; timer=TimerOutput(), kwargs...)
     eltype_ = eltype(peps)
     eltype_real = real(eltype_)
     

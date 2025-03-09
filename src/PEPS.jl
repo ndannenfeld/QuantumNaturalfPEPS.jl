@@ -1,4 +1,7 @@
-mutable struct PEPS
+# Define AbstractPEPS and PEPS
+abstract type AbstractPEPS end
+
+mutable struct PEPS <: AbstractPEPS
     tensors::Matrix{ITensor}
     double_layer_envs
     bond_dim::Integer
@@ -45,15 +48,15 @@ function PEPS(::Type{S}, peps::PEPS) where {S<:Number}
     return new_peps
 end
 
-maxbonddim(peps::PEPS) = peps.bond_dim
+maxbonddim(peps::AbstractPEPS) = peps.bond_dim
 
-Base.size(peps::PEPS, args...) = size(peps.tensors, args...)
-Base.getindex(peps::PEPS, args...) = getindex(peps.tensors, args...)
-Base.setindex!(peps::PEPS, v, i::Int, j::Int) = (peps.tensors[i, j] = v)
-Base.show(io::IO, peps::PEPS) = print(io, "PEPS(L=$(size(peps)), bond_dim=$(peps.bond_dim), sample_dim=$(peps.sample_dim), contract_dim=$(peps.contract_dim), double_contract_dim=$(peps.double_contract_dim))")
-Base.eltype(peps::PEPS) = eltype(peps.tensors[1, 1])
+Base.size(peps::AbstractPEPS, args...) = size(peps.tensors, args...)
+Base.getindex(peps::AbstractPEPS, args...) = getindex(peps.tensors, args...)
+Base.setindex!(peps::AbstractPEPS, v, i::Int, j::Int) = (peps.tensors[i, j] = v)
+Base.show(io::IO, peps::AbstractPEPS) = print(io, "PEPS(L=$(size(peps)), bond_dim=$(peps.bond_dim), sample_dim=$(peps.sample_dim), contract_dim=$(peps.contract_dim), double_contract_dim=$(peps.double_contract_dim))")
+Base.eltype(peps::AbstractPEPS) = eltype(peps.tensors[1, 1])
 
-function Base.getproperty(x::PEPS, y::Symbol)
+function Base.getproperty(x::AbstractPEPS, y::Symbol)
     if y === :double_layer_envs
         double_layer_envs = getfield(x, :double_layer_envs)
         if double_layer_envs === nothing
@@ -68,8 +71,8 @@ function Base.getproperty(x::PEPS, y::Symbol)
     end
 end
 
-Base.convert(::Type{Vector}, peps::PEPS; mask=peps.mask) = flatten(peps; mask)
-function flatten(peps::PEPS; mask=peps.mask) # Flattens the tensors into a vector
+Base.convert(::Type{Vector}, peps::AbstractPEPS; mask=peps.mask) = flatten(peps; mask)
+function flatten(peps::AbstractPEPS; mask=peps.mask) # Flattens the tensors into a vector
     type = eltype(peps)
     θ = Vector{type}(undef, length(peps; mask))
     pos = 1
@@ -86,15 +89,7 @@ function flatten(peps::PEPS; mask=peps.mask) # Flattens the tensors into a vecto
     return θ
 end
 
-#function Base.length(peps::PEPS)
-#    x = 0
-#    for ten in peps.tensors
-#        x += length(ITensors.tensor(ten))
-#    end
-#    return x
-#end
-
-function Base.length(peps::PEPS; mask=peps.mask)
+function Base.length(peps::AbstractPEPS; mask=peps.mask)
     x = 0
     for i in 1:size(peps, 1)
         for j in 1:size(peps, 2)
@@ -106,7 +101,7 @@ function Base.length(peps::PEPS; mask=peps.mask)
     return x
 end
 
-function tensor_std(peps::PEPS)
+function tensor_std(peps::AbstractPEPS)
     mean_, mean_2 = 0, 0
     l = 0
     for ten in peps.tensors
@@ -119,7 +114,7 @@ function tensor_std(peps::PEPS)
     return sqrt(mean_2 - mean_^2)
 end
 
-function shift!(peps::PEPS, shift::Bool) 
+function shift!(peps::AbstractPEPS, shift::Bool) 
     if shift
         return shift!(peps, 2 * tensor_std(peps) / maxbonddim(peps))
     else
@@ -127,14 +122,14 @@ function shift!(peps::PEPS, shift::Bool)
     end
 end
 
-function shift!(peps::PEPS, shift::Number)
+function shift!(peps::AbstractPEPS, shift::Number)
     for ten in peps.tensors
         ten .+= shift 
     end
     return peps
 end
 
-function write!(peps::PEPS, θ::Vector{T}; reset_double_layer=true, mask=peps.mask) where T# Writes the vector θ into the tensors.
+function write!(peps::AbstractPEPS, θ::Vector{T}; reset_double_layer=true, mask=peps.mask) where T# Writes the vector θ into the tensors.
     @assert eltype(peps) == T "The type of the PEPS is $(eltype(peps)) and the type of the vector θ is $T. They must be the same type."
     pos = 1
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
@@ -268,7 +263,7 @@ function init_Links(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1)
     return h_links, v_links
 end
 
-function ITensors.siteind(peps::PEPS, i, j)
+function ITensors.siteind(peps::AbstractPEPS, i, j)
     Lx, Ly = size(peps)
     if Lx == 1 && Ly == 1
         return firstind(peps[1, 1])
@@ -282,12 +277,12 @@ function ITensors.siteind(peps::PEPS, i, j)
     return si
 end
 
-ITensors.linkinds(peps::PEPS, i, j) = filter!(!=(siteind(peps, i, j)), collect(inds(peps[i ,j])))
+ITensors.linkinds(peps::AbstractPEPS, i, j) = filter!(!=(siteind(peps, i, j)), collect(inds(peps[i ,j])))
 
-ITensors.siteinds(peps::PEPS) = [siteind(peps, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
+ITensors.siteinds(peps::AbstractPEPS) = [siteind(peps, i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
 
 # returns the exact inner product of 2 peps (only used for testing purposes)
-function inner_peps(psi::PEPS, psi2::PEPS)
+function inner_peps(psi::AbstractPEPS, psi2::AbstractPEPS)
     x = 1
     for i in 1:size(psi)[1]
         for j in 1:size(psi)[2]
@@ -302,7 +297,7 @@ function get_projector(i::Int, index; shift=1)
     return onehot(index=>i+shift)
 end
 
-function get_projected(peps::PEPS, S::Matrix{Int64}, i, j)
+function get_projected(peps::AbstractPEPS, S::Matrix{Int64}, i, j)
     if i === Colon() && j === Colon()
         return [get_projected(peps, S[i, j], i, j) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
     elseif i === Colon()
@@ -313,8 +308,8 @@ function get_projected(peps::PEPS, S::Matrix{Int64}, i, j)
     return get_projected(peps, S[i, j], i, j)
 end
 
-get_projected(peps::PEPS, Sij::Int64, i::Int64, j::Int64) = peps[i,j] * get_projector(Sij, siteind(peps, i, j))
-get_projected(peps::PEPS, S::Matrix{Int64}) = get_projected(peps, S, :, :)
+get_projected(peps::AbstractPEPS, Sij::Int64, i::Int64, j::Int64) = peps[i,j] * get_projector(Sij, siteind(peps, i, j))
+get_projected(peps::AbstractPEPS, S::Matrix{Int64}) = get_projected(peps, S, :, :)
 
 function contract_peps_exact(peps)
     x = 1
@@ -368,7 +363,7 @@ function iPEPS_to_fPEPS(iPEPS, Lx, Ly, pattern; vectors=:random)
 
     peps = PEPS(T, hilbert; bond_dim=bdim, sample_dim=samplecut, double_contract_dim=marginalcut, contract_dim, shift=false, show_warning=true)
     
-    return iPEPS_to_fPEPS!(peps::PEPS, iPEPS, Lx, Ly, pattern; vectors)
+    return iPEPS_to_fPEPS!(peps, iPEPS, Lx, Ly, pattern; vectors)
 end
 
 function iPEPS_to_fPEPS!(peps::PEPS, iPEPS, Lx, Ly, pattern; vectors=:random)
@@ -380,7 +375,7 @@ function iPEPS_to_fPEPS!(peps::PEPS, iPEPS, Lx, Ly, pattern; vectors=:random)
     return peps
 end
 
-function iPEPS_to_fPEPS_bulk!(peps, iPEPS, pattern)
+function iPEPS_to_fPEPS_bulk!(peps::PEPS, iPEPS, pattern)
     for i in 2:size(peps, 1)-1
         for j in 2:size(peps, 2)-1
             x = pattern[(i-2)%(size(pattern,1))+1, (j-2)%(size(pattern,2))+1]

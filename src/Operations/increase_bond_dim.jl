@@ -33,13 +33,13 @@ function increase_bond_dim(o1::ITensor, o2::ITensor, new_bond_dim::Int; value=0,
 end
 
 """
-increase_bond_dim!(peps::PEPS, new_bond_dim::Int; value=0)
+increase_bond_dim!(peps::AbstractPEPS, new_bond_dim::Int; value=0)
 
 Increase the bond dimension of a PEPS by increasing the bond dimension of each tensor in the PEPS without changing the contracted peps.
 value = 0: will lead to an unchanged spectrum of the PEPS
 value != 0: will lead to a modified spectrum of the PEPS, the larger the value, the larger the change in the spectrum and the less contractable the PEPS will be.
 """
-function increase_bond_dim!(peps::PEPS, new_bond_dim::Int; value=0, svalue=0)
+function increase_bond_dim!(peps::AbstractPEPS, new_bond_dim::Int; value=0, svalue=0)
 
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
         if i < size(peps, 1)
@@ -53,4 +53,4 @@ function increase_bond_dim!(peps::PEPS, new_bond_dim::Int; value=0, svalue=0)
     return peps
 end
 
-increase_bond_dim(peps::PEPS, new_bond_dim::Int; kwargs...) = increase_bond_dim!(deepcopy(peps), new_bond_dim; kwargs...)
+increase_bond_dim(peps::AbstractPEPS, new_bond_dim::Int; kwargs...) = increase_bond_dim!(deepcopy(peps), new_bond_dim; kwargs...)

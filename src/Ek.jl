@@ -58,7 +58,7 @@ function insert(arr, x)
 end
 
 # a function that computes the contraction of the PEPS with flipped spins at a position specified in flip_term
-function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, flip_term, fourb_envs_r, fourb_envs_l)
+function get_4body_term(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, flip_term, fourb_envs_r, fourb_envs_l)
     con_left = 1
     con_right = 1
     f = 0
@@ -131,7 +131,7 @@ function get_4body_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vect
 end
 
 # same as get_4body_term but for horizontal Ek_terms
-function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, flip_term, h_envs_r, h_envs_l)
+function get_term(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, flip_term, h_envs_r, h_envs_l)
     f = 0
     @assert length(flip_term) <= 2 " Only nearest and next nearest neighbour interactions are efficiently supported. Note that if the opertor is in he computational basis, any interaction length is possible."
     ys = Int[]
@@ -187,7 +187,7 @@ function get_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Env
 end
 
 # same as get_term but for longer horizontal Ek_terms
-function get_longerHor_term(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, flip_term, h_envs_r, h_envs_l)
+function get_longerHor_term(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vector{Environment}, S::Matrix{Int64}, flip_term, h_envs_r, h_envs_l)
     f = 0
     ys = Int[]
     Sijs = Int[]
@@ -246,7 +246,7 @@ function get_longerHor_term(peps::PEPS, env_top::Vector{Environment}, env_down::
 end
 
 # computes the local energy <sample|H|ψ>/<sample|ψ>
-function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, env_down::Vector{Environment},
+function get_logψ_flipped(peps::AbstractPEPS, Ek_terms, env_top::Vector{Environment}, env_down::Vector{Environment},
                           sample::Matrix{Int64}, logψ::Number;
                           h_envs_r=nothing, h_envs_l=nothing, fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing,
                           timer=TimerOutput())
@@ -316,20 +316,20 @@ function get_logψ_flipped(peps::PEPS, Ek_terms, env_top::Vector{Environment}, e
     return logψ_flipped
 end
 
-function get_Ek(peps::PEPS, ham::OpSum, sample; kwargs...)
+function get_Ek(peps::AbstractPEPS, ham::OpSum, sample; kwargs...)
     hilbert = siteinds(peps)
     ham_op = TensorOperatorSum(ham, hilbert)
     return get_Ek(peps, ham_op, sample; kwargs...)
 end
 
-function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, sample; env_top=Array{Environment}(undef, size(S,1)-1), kwargs...)
+function get_Ek(peps::AbstractPEPS, ham_op::TensorOperatorSum, sample; env_top=Array{Environment}(undef, size(S,1)-1), kwargs...)
     # get the environment tensors
     logψ, env_top, env_down = get_logψ_and_envs(peps, sample, env_top) # compute the environments of the peps according to that sample
     return get_Ek(peps, ham_op, env_top, env_down, sample, logψ; kwargs...)
 end
 
 
-function get_Ek(peps::PEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number; h_envs_r=nothing, h_envs_l=nothing, fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing, Ek_terms=nothing, kwargs...)
+function get_Ek(peps::AbstractPEPS, ham_op::TensorOperatorSum, env_top::Vector{Environment}, env_down::Vector{Environment}, sample::Matrix{Int64}, logψ::Number; h_envs_r=nothing, h_envs_l=nothing, fourb_envs_r=nothing, fourb_envs_l=nothing, logψ_flipped=nothing, Ek_terms=nothing, kwargs...)
     if Ek_terms === nothing
         Ek_terms = QuantumNaturalGradient.get_precomp_sOψ_elems(ham_op, sample; get_flip_sites=true)
     end

@@ -4,13 +4,13 @@
 # Single entry point for generation of local energies
 ################################################################################
 
-function generate_Eks(peps::PEPS, ham::OpSum; kwargs...)
+function generate_Eks(peps::AbstractPEPS, ham::OpSum; kwargs...)
     hilbert = siteinds(peps)
     ham_op = TensorOperatorSum(ham, hilbert)
     return generate_Eks(peps, ham_op; kwargs...)
 end
 
-function generate_Eks(peps::PEPS, ham_op::TensorOperatorSum; threaded=false, multiproc=false, kwargs...)
+function generate_Eks(peps::AbstractPEPS, ham_op::TensorOperatorSum; threaded=false, multiproc=false, kwargs...)
     if multiproc
         return generate_Eks_multiproc(peps, ham_op; threaded, kwargs...)
     elseif threaded
@@ -24,7 +24,7 @@ end
 # Single-threaded version
 ################################################################################
 
-function generate_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), kwargs...)
+function generate_Eks_singlethread(peps::AbstractPEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), kwargs...)
     function Eks_(Θ::Vector{T}, sample_nr::Integer; kwargs2...) where T
         # Merge any new keyword arguments
         if length(kwargs2) > 0
@@ -49,7 +49,7 @@ function generate_Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum; timer=
     return Eks_
 end
 
-function Eks_singlethread(peps::PEPS, ham_op::TensorOperatorSum, sample_nr::Integer; 
+function Eks_singlethread(peps::AbstractPEPS, ham_op::TensorOperatorSum, sample_nr::Integer; 
                           timer=TimerOutput(), kwargs...)
     eltype_ = eltype(peps)
     eltype_real = real(eltype_)
@@ -77,7 +77,7 @@ end
 # Multi-threaded version
 ################################################################################
 
-function generate_Eks_threaded(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), kwargs...)
+function generate_Eks_threaded(peps::AbstractPEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), kwargs...)
     function Eks_(Θ::Vector{T}, sample_nr::Integer; reset_double_layer=true, kwargs2...) where T
         if length(kwargs2) > 0
             kwargs_merged = merge(kwargs, kwargs2)
@@ -156,7 +156,7 @@ end
 # Multi-processing version
 ################################################################################
 
-function generate_Eks_multiproc(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), threaded=true, kwargs...)
+function generate_Eks_multiproc(peps::AbstractPEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), threaded=true, kwargs...)
     function Eks_(Θ::Vector{T}, sample_nr::Integer; kwargs2...) where T
         if length(kwargs2) > 0
             kwargs_merged = merge(kwargs, kwargs2)
