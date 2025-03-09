@@ -1,12 +1,14 @@
 ###### Multiple threads
-function generate_Oks_and_Eks_threaded(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), kwargs...)
+function generate_Oks_and_Eks_threaded(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(),
+                                       double_layer_update=update_double_layer_envs!,
+                                       kwargs...)
     function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer; reset_double_layer=true, kwargs2...) where T
         if length(kwargs2) > 0
             kwargs = merge(kwargs, kwargs2)
         end
         write!(peps, Θ; reset_double_layer)
         if reset_double_layer
-            @timeit timer "double_layer_envs" update_double_layer_envs!(peps) # update the double layer environments once for the peps
+            @timeit timer "double_layer_envs" double_layer_update(peps) # update the double layer environments once for the peps
         end
         return Oks_and_Eks_threaded(peps, ham_op, sample_nr; timer, kwargs...)
     end

@@ -1,4 +1,6 @@
-function generate_Oks_and_Eks_multiproc(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), threaded=true, kwargs...)
+function generate_Oks_and_Eks_multiproc(peps::PEPS, ham_op::TensorOperatorSum;
+                                        timer=TimerOutput(), threaded=true, double_layer_update=update_double_layer_envs!,
+                                        kwargs...)
     n_threads = Distributed.remotecall_fetch(()->Threads.nthreads(), workers()[1])
 
     function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer; kwargs2...) where T
@@ -6,7 +8,7 @@ function generate_Oks_and_Eks_multiproc(peps::PEPS, ham_op::TensorOperatorSum; t
             kwargs = merge(kwargs, kwargs2)
         end
         write!(peps, Θ)
-        @timeit timer "double_layer_envs" update_double_layer_envs!(peps) # update the double layer environments once for the peps
+        @timeit timer "double_layer_envs" double_layer_update(peps) # update the double layer environments once for the peps
         return @timeit timer "Oks_and_Eks" Oks_and_Eks_multiproc(peps, ham_op, sample_nr; timer, n_threads, kwargs...)
     end
     return Oks_and_Eks_
@@ -41,7 +43,7 @@ function Oks_and_Eks_multiproc(peps, ham_op, sample_nr; Oks=nothing, importance_
         Oks = Matrix{eltype_}(undef, nr_parameters, sample_nr_eff)
     end
 
-    Threads.@threads for (i, out_i) in collect(enumerate(out))
+    for (i, out_i) in collect(enumerate(out))
         i1 = k_eff * (i - 1) + 1
         i2 = k_eff * i
         

@@ -3,15 +3,19 @@
 mutable struct Environment
     env::MPS
     f::Real
-    function Environment(env, f; normalize=true)
+    function Environment(env::MPS, f::Real; normalize=true)
         env = new(env, f)
         if normalize
             normalize!(env)
         end
         return env
     end
-    Environment(env; kwargs...) = Environment(env, 0.0; kwargs...)
+    Environment(env; kwargs...) = Environment(env, 0.; kwargs...)
 end
+convert_eltype(::Type{S}, t::ITensor) where S = ITensor(S.(t.tensor))
+Environment(::Type{S}, env::Environment) where S = Environment(convert_eltype.(S, env.env), S(env.f); normalize=false)
+
+
 Base.getindex(env::Environment, i::Int) = env.env[i]
 Base.reverse(env::Environment) = ReverseEnvironment(env)
 ITensors.maxlinkdim(env::Environment) = maxlinkdim(env.env)

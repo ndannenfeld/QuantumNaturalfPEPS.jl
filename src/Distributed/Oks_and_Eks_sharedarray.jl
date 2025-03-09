@@ -1,11 +1,13 @@
-function generate_Oks_and_Eks_multiproc_sharedarrays(peps::PEPS, ham_op::TensorOperatorSum; timer=TimerOutput(), threaded=true, kwargs...)
+function generate_Oks_and_Eks_multiproc_sharedarrays(peps::PEPS, ham_op::TensorOperatorSum; 
+                                                     timer=TimerOutput(), threaded=true, double_layer_update=update_double_layer_envs!,
+                                                     kwargs...)
     n_threads = Distributed.remotecall_fetch(()->Threads.nthreads(), workers()[1])
     function Oks_and_Eks_(Θ::Vector{T}, sample_nr::Integer; kwargs2...) where T
         if length(kwargs2) > 0
             kwargs = merge(kwargs, kwargs2)
         end
         write!(peps, Θ)
-        @timeit timer "double_layer_envs" update_double_layer_envs!(peps)  # update the double layer envs once for the peps
+        @timeit timer "double_layer_envs" double_layer_update(peps)  # update the double layer envs once for the peps
         return @timeit timer "Oks_and_Eks" Oks_and_Eks_multiproc_sharedarrays(peps, ham_op, sample_nr;
                                                                timer=timer, n_threads=n_threads, kwargs...)
     end

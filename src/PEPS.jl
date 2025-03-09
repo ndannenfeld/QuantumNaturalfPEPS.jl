@@ -23,7 +23,7 @@ end
 
 function PEPS(::Type{S}, peps::PEPS) where {S<:Number}
     tensors = convert_eltype.(S, peps.tensors)
-    if peps.double_layer_envs === nothing
+    if getfield(peps, :double_layer_envs) === nothing
         double_layer_envs = nothing
     else
         double_layer_envs = Environment.(S, peps.double_layer_envs)
@@ -170,7 +170,6 @@ function PEPS(::Type{S}, type, Lx::Int64, Ly::Int64; kwargs...) where {S<:Number
 end
 
 PEPS(hilbert::Matrix{Index{Int64}}; kwargs...) = PEPS(Float64, hilbert; kwargs...)
-PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; kwargs...) where {S<:Number} = PEPS(S, hilbert; kwargs...)
 
 """
     PEPS(S, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, shift=true, kwargs...) where {S<:Number}
