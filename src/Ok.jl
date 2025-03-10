@@ -54,7 +54,7 @@ function get_Ok(peps::PEPS, env_top::Vector{Environment}, env_down::Vector{Envir
                         Ok[pos+spin:loc_dim:pos+loc_dim*shift-1] .= 0
                     end
                 end
-                pos = pos+2*shift
+                pos = pos+loc_dim*shift
             end
         end
     end
