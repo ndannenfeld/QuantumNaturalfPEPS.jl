@@ -53,37 +53,42 @@ maxbonddim(peps::AbstractPEPS) = peps.bond_dim
 Base.size(peps::AbstractPEPS, args...) = size(peps.tensors, args...)
 Base.getindex(peps::AbstractPEPS, args...) = getindex(peps.tensors, args...)
 Base.setindex!(peps::AbstractPEPS, v, i::Int, j::Int) = (peps.tensors[i, j] = v)
-Base.show(io::IO, peps::AbstractPEPS) = print(io, "PEPS(L=$(size(peps)), bond_dim=$(peps.bond_dim), sample_dim=$(peps.sample_dim), contract_dim=$(peps.contract_dim), double_contract_dim=$(peps.double_contract_dim))")
+Base.show(io::IO, peps::AbstractPEPS) = print(io, "$(typeof(peps))(L=$(size(peps)), bond_dim=$(peps.bond_dim), sample_dim=$(peps.sample_dim), contract_dim=$(peps.contract_dim), double_contract_dim=$(peps.double_contract_dim))")
 Base.eltype(peps::AbstractPEPS) = eltype(peps.tensors[1, 1])
 
 function Base.getproperty(x::AbstractPEPS, y::Symbol)
     if y === :double_layer_envs
         double_layer_envs = getfield(x, :double_layer_envs)
         if double_layer_envs === nothing
-            @warn "PEPS: Double layer environments generated automatically"
+            @warn "$(typeof(x)): Double layer environments generated automatically"
             double_layer_envs = generate_double_layer_envs(x)
             setfield!(x, :double_layer_envs, double_layer_envs)
         end
         return double_layer_envs
-        
+    elseif y === :tensors
+        tensors = getfield(x, :tensors)
+        if tensors === nothing # For the LatentPEPS implementation
+            @warn "$(typeof(x)): Tensors generated automatically"
+            tensors = generate_tensors(x)
+            setfield!(x, :tensors, tensors)
+        end
+        return tensors
     else
         return getfield(x, y)
     end
 end
 
-Base.convert(::Type{Vector}, peps::AbstractPEPS; mask=peps.mask) = flatten(peps; mask)
-function flatten(peps::AbstractPEPS; mask=peps.mask) # Flattens the tensors into a vector
+Base.convert(::Type{Vector}, peps::AbstractPEPS; mask=peps.mask) = vec(peps; mask)
+function Base.vec(peps::AbstractPEPS; mask=peps.mask) # Flattens the tensors into a vector
     type = eltype(peps)
     θ = Vector{type}(undef, length(peps; mask))
     pos = 1
-    for i in 1:size(peps, 1)
-        for j in 1:size(peps, 2)
-            if mask[i,j]!=0
-                shift = prod(dim.(inds(peps[i,j])))
-                x = @view θ[pos:pos+shift-1]
-                permute_reshape_and_copy!(x, peps[i, j], (siteind(peps, i, j), linkinds(peps, i, j)...))
-                pos = pos+shift
-            end
+    for i in 1:size(peps, 1), j in 1:size(peps, 2)
+        if mask[i,j] != 0
+            shift = prod(dim.(inds(peps[i,j])))
+            x = @view θ[pos:pos+shift-1]
+            permute_reshape_and_copy!(x, peps[i, j], (siteind(peps, i, j), linkinds(peps, i, j)...))
+            pos = pos+shift
         end
     end
     return θ
@@ -221,26 +226,24 @@ function PEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=randomITenso
 
     # filling the matrix of tensors with random unitary ITensors wich share the same indices with their neighbours
     tensors = Array{ITensor}(undef, Lx, Ly)
-    inds = Vector{Index{Int64}}()
-    for i in 1:Lx
-        for j in 1:Ly
-            push!(inds, hilbert[i, j])
+    for i in 1:Lx, j in 1:Ly
+        inds = Vector{Index{Int64}}()
+        push!(inds, hilbert[i, j])
 
-            if j != Ly
-                push!(oinds, h_links[i,j])
-            end
-            if i != Lx
-                push!(oinds, v_links[i,j])
-            end
-            if j != 1
-                push!(inds, h_links[i,j-1])
-            end
-            if i != 1
-                push!(inds, v_links[i-1,j])
-            end
-
-            tensors[i,j] = tensor_init(S, inds)
+        if j != Ly
+            push!(inds, h_links[i,j])
         end
+        if i != Lx
+            push!(inds, v_links[i,j])
+        end
+        if j != 1
+            push!(inds, h_links[i,j-1])
+        end
+        if i != 1
+            push!(inds, v_links[i-1,j])
+        end
+
+        tensors[i,j] = tensor_init(S, inds)
     end
     return tensors
 end
@@ -248,8 +251,8 @@ end
 function init_Links(hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1)
     Lx, Ly = size(hilbert)
     # initializing bond indices
-    h_links = Array{Index{Int64}}(undef, Lx, Ly-1)
-    v_links = Array{Index{Int64}}(undef, Lx-1, Ly)
+    h_links = Matrix{Index{Int64}}(undef, Lx, Ly-1)
+    v_links = Matrix{Index{Int64}}(undef, Lx-1, Ly)
     for i in 1:Lx
         for j in 1:Ly-1
             h_links[i,j] = Index(bond_dim, "h_link, $(i);$(j) -> $(i);$(j+1)")
@@ -276,6 +279,10 @@ function ITensors.siteind(peps::AbstractPEPS, i, j)
     @assert si !== nothing
     return si
 end
+
+sitedims(peps::AbstractPEPS) = [dim(siteind(peps, i, j)) for i in 1:size(peps, 1), j in 1:size(peps, 2)]
+sitedims(peps::AbstractPEPS, i, j) = dim(siteind(peps, i, j))
+sitedim(peps::AbstractPEPS) = sitedims(peps, 1, 1)
 
 ITensors.linkinds(peps::AbstractPEPS, i, j) = filter!(!=(siteind(peps, i, j)), collect(inds(peps[i ,j])))
 
