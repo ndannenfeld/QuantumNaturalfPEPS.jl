@@ -34,7 +34,6 @@ include("Test.jl")
 
 
 export PEPS
-export flatten
 export write!
 export Ok_and_Ek
 export generate_Oks_and_Eks

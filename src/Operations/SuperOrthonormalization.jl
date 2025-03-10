@@ -192,7 +192,7 @@ function divide_by_spectrum!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITenso
 end
 divide_by_spectrum(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; kwargs...) = divide_by_spectrum!(deepcopy(peps); kwargs...)
 
-function multiply_spectrum!(peps, spectrum)
+function multiply_spectrum!(peps::AbstractPEPS, spectrum)
     spectrum = sqrt.(spectrum)
     spectrum = diagm(spectrum)
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
