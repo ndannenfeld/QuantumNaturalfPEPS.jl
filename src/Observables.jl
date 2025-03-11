@@ -64,7 +64,7 @@ function get_ExpectationValues!(peps, O_op, Observable, logψ, logpc; it=100)
         logψ_flipped = Dict{Any, Number}()
         for j in 1:length(O_op)
             O_terms = QuantumNaturalGradient.get_precomp_sOψ_elems(O_op[j], S; get_flip_sites=true)
-            Observable[i,j] = get_Ek(peps, O_op[j], env_top, env_down, S, logψ[i], h_envs_r, h_envs_l; fourb_envs_r, fourb_envs_l, logψ_flipped, Ek_terms=O_terms)
+            Observable[i,j] = get_Ek(peps, O_op[j], env_top, env_down, S, logψ[i]; h_envs_r, h_envs_l, fourb_envs_r, fourb_envs_l, logψ_flipped, Ek_terms=O_terms)
         end
     end
 
