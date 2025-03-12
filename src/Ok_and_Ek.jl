@@ -1,12 +1,10 @@
 
 # Calculates the Energy and Gradient of a given peps and hamiltonian
-function Ok_and_Ek(peps, ham_op; timer=TimerOutput(), Ok=nothing, sampling_mode=:full,
+function Ok_and_Ek(peps::AbstractPEPS, ham_op; timer=TimerOutput(), Ok=nothing, sampling_mode=:full,
                    resample=false, correct_sampling_error=true, resample_energy=0, # TODO: remove
                    )
     
     S, logpc, env_top = @timeit timer "sampling" get_sample(peps; mode=sampling_mode, timer) # draw a sample
-
-    
     
     if resample
         S = QuantumNaturalGradient.resample_with_H(S, ham_op; resample_energy)

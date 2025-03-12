@@ -143,7 +143,7 @@ function get_horizontal_envs!(peps::AbstractPEPS, env_top::Vector{Environment}, 
     end
 end
 
-function contract_recursiv!(h_envs, a, b; c=ones(length(a)), d=ones(length(a)), right_to_left=true)
+function contract_recursiv!(h_envs, a, b; c=ones(eltype(a[1]), length(a)), d=ones(eltype(a[1]), length(a)), right_to_left=true)
     if right_to_left
         h_envs[end] = a[end]*b[end]*c[end]*d[end]
         for j in length(a)-1:-1:2

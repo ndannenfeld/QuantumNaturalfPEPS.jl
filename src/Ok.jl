@@ -20,6 +20,7 @@ function get_Ok(peps::AbstractPEPS, env_top::Vector{Environment}, env_down::Vect
     if isreal(ok_tensor) 
         g = real(g)
     end
+    
     ok_tensor *= g
     @assert eltype(ok_tensor) === eltype(peps) "The gradient is $(eltype(ok_tensor)) but the PEPS is $(eltype(peps))"
     return ok_tensor

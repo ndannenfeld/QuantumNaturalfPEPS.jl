@@ -245,7 +245,7 @@ function PEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=randomITenso
     tensors = Array{ITensor}(undef, Lx, Ly)
     for i in 1:Lx, j in 1:Ly
         inds = get_links(hilbert, h_links, v_links, i, j)
-        tensors[i,j] = tensor_init(S, inds)
+        tensors[i, j] = tensor_init(S, inds)
     end
     return tensors
 end
@@ -301,10 +301,13 @@ function inner_peps(psi::AbstractPEPS, psi2::AbstractPEPS)
     return x[1]
 end
 
-function get_projector(i::Int, index; shift=1)
+function get_projector(::Type{S}, i::Int, index; shift=1) where {S<:Number}
     @assert index.space >= i+shift "The dimension is $(index.space) but the requested index is $(i+shift)"
-    return onehot(index=>i+shift)
+    return onehot(S, index=>i+shift)
 end
+
+get_projector(i::Int, index; kwargs...) = get_projector(Int64, i, index; kwargs...)
+
 
 function get_projected(peps::AbstractPEPS, S::Matrix{Int64}, i, j)
     if i === Colon() && j === Colon()
