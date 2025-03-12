@@ -1,6 +1,7 @@
 # Define AbstractPEPS and PEPS
 abstract type AbstractPEPS end
 
+# TODO: Remove shift as argument
 mutable struct PEPS <: AbstractPEPS
     tensors::Matrix{ITensor}
     double_layer_envs
@@ -16,7 +17,7 @@ mutable struct PEPS <: AbstractPEPS
 
     mask::Matrix
 
-    function PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=2*bond_dim,
+    function PEPS(tensors::Matrix{ITensor}, bond_dim::Integer; sample_dim=bond_dim, contract_dim=3*bond_dim, double_contract_dim=bond_dim,
                                                                sample_cutoff=1e-13, contract_cutoff=1e-13, double_contract_cutoff=1e-13,
                                                                shift=false, show_warning=false, mask=ones(size(tensors)))
         peps = new(tensors, nothing, bond_dim, sample_dim, sample_cutoff, contract_dim, contract_cutoff, double_contract_dim, double_contract_cutoff, show_warning, mask)
@@ -67,8 +68,8 @@ function Base.getproperty(x::AbstractPEPS, y::Symbol)
         return double_layer_envs
     elseif y === :tensors
         tensors = getfield(x, :tensors)
-        if tensors === nothing # For the LatentPEPS implementation
-            @warn "$(typeof(x)): Tensors generated automatically"
+        if tensors === nothing # For alternative PEPS implementation
+            #@warn "$(typeof(x)): Tensors generated automatically"
             tensors = generate_tensors(x)
             setfield!(x, :tensors, tensors)
         end
@@ -78,7 +79,7 @@ function Base.getproperty(x::AbstractPEPS, y::Symbol)
     end
 end
 
-Base.convert(::Type{Vector}, peps::AbstractPEPS; mask=peps.mask) = vec(peps; mask)
+Base.convert(::Type{Vector}, peps::AbstractPEPS; kwargs...) = vec(peps; kwargs...)
 function Base.vec(peps::AbstractPEPS; mask=peps.mask) # Flattens the tensors into a vector
     type = eltype(peps)
     θ = Vector{type}(undef, length(peps; mask))
@@ -104,34 +105,6 @@ function Base.length(peps::AbstractPEPS; mask=peps.mask)
         end
     end
     return x
-end
-
-function tensor_std(peps::AbstractPEPS)
-    mean_, mean_2 = 0, 0
-    l = 0
-    for ten in peps.tensors
-        mean_ += sum(ten.tensor.storage)
-        mean_2 += sum(x->x^2, ten.tensor.storage)
-        l += length(ITensors.tensor(ten))
-    end
-    mean_ /= l
-    mean_2 /= l
-    return sqrt(mean_2 - mean_^2)
-end
-
-function shift!(peps::AbstractPEPS, shift::Bool) 
-    if shift
-        return shift!(peps, 2 * tensor_std(peps) / maxbonddim(peps))
-    else
-        return peps
-    end
-end
-
-function shift!(peps::AbstractPEPS, shift::Number)
-    for ten in peps.tensors
-        ten .+= shift 
-    end
-    return peps
 end
 
 function write!(peps::AbstractPEPS, θ::Vector{T}; reset_double_layer=true, mask=peps.mask) where T# Writes the vector θ into the tensors.
@@ -219,6 +192,50 @@ function isoPEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=random_un
     return tensors
 end
 
+function get_links(sites::Matrix{Index{Int64}}, h_links, v_links, i, j; insert_dummy_inds=false, bond_dim=1)
+    Lx, Ly = size(sites)
+    # Define Indices
+    inds = Index{Int64}[]
+    dummy = Index{Int64}[]
+
+    push!(inds, sites[i, j])
+
+    if j != Ly
+        push!(inds, h_links[i,j])
+    elseif insert_dummy_inds
+        ind = Index(bond_dim, "dummyedge_h_link, $(i);$(j)")
+        push!(inds, ind)
+        push!(dummy, ind)
+    end
+    if i != Lx
+        push!(inds, v_links[i,j])
+    elseif insert_dummy_inds
+        ind = Index(bond_dim, "dummyedge_v_link, $(i);$(j)")
+        push!(inds, ind)
+        push!(dummy, ind)
+    end
+    if j != 1
+        push!(inds, h_links[i,j-1])
+    elseif insert_dummy_inds
+        ind = Index(bond_dim, "dummyedge_h_link, $(i);$(j)")
+        push!(inds, ind)
+        push!(dummy, ind)
+    end
+    if i != 1
+        push!(inds, v_links[i-1,j])
+    elseif insert_dummy_inds
+        ind = Index(bond_dim, "dummyedge_v_link, $(i);$(j)")
+        push!(inds, ind)
+        push!(dummy, ind)
+    end
+    if insert_dummy_inds
+        return inds, dummy
+    end
+
+    return inds
+end
+
+
 function PEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=randomITensor) where {S<:Number}
     Lx, Ly = size(hilbert)
 
@@ -227,22 +244,7 @@ function PEPS_tensor_init(::Type{S}, hilbert, bond_dim; tensor_init=randomITenso
     # filling the matrix of tensors with random unitary ITensors wich share the same indices with their neighbours
     tensors = Array{ITensor}(undef, Lx, Ly)
     for i in 1:Lx, j in 1:Ly
-        inds = Vector{Index{Int64}}()
-        push!(inds, hilbert[i, j])
-
-        if j != Ly
-            push!(inds, h_links[i,j])
-        end
-        if i != Lx
-            push!(inds, v_links[i,j])
-        end
-        if j != 1
-            push!(inds, h_links[i,j-1])
-        end
-        if i != 1
-            push!(inds, v_links[i-1,j])
-        end
-
+        inds = get_links(hilbert, h_links, v_links, i, j)
         tensors[i,j] = tensor_init(S, inds)
     end
     return tensors
@@ -411,16 +413,16 @@ function iPEPS_to_fPEPS_boundary!(peps, iPEPS, pattern; vectors=:random)
             x = pattern[(i-2+size(pattern,1))%size(pattern,1) + 1, (j-2+size(pattern,2))%size(pattern,2) + 1]
             j == 1 ? y = 1 : y = 3
             if isFour
-                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(vectors[y], indices[y])
+                ipeps_ten = itensor(iPEPS[x], indices)*itensor(vectors[y], indices[y])
             else
-                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(popfirst!(vectors), indices[y])
+                ipeps_ten = itensor(iPEPS[x], indices)*itensor(popfirst!(vectors), indices[y])
             end
             if i == 1 || i == size(peps, 1)
                 i == 1 ? y = 4 : y = 2
                 if isFour
-                    ipeps_ten *= ITensor(vectors[y], indices[y])
+                    ipeps_ten *= itensor(vectors[y], indices[y])
                 else
-                    ipeps_ten *= ITensor(popfirst!(vectors), indices[y])
+                    ipeps_ten *= itensor(popfirst!(vectors), indices[y])
                 end
             end
             peps[i,j] = write_Tensor!(peps, ipeps_ten, i, j)
@@ -432,9 +434,9 @@ function iPEPS_to_fPEPS_boundary!(peps, iPEPS, pattern; vectors=:random)
             x = pattern[(i-2+size(pattern,1))%size(pattern,1) + 1, (j-2+size(pattern,2))%size(pattern,2) + 1]
             i == 1 ? y = 4 : y = 2
             if isFour
-                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(vectors[y], indices[y])
+                ipeps_ten = itensor(iPEPS[x], indices)*itensor(vectors[y], indices[y])
             else
-                ipeps_ten = ITensor(iPEPS[x], indices)*ITensor(popfirst!(vectors), indices[y])
+                ipeps_ten = itensor(iPEPS[x], indices)*itensor(popfirst!(vectors), indices[y])
             end
             peps[i,j] = write_Tensor!(peps, ipeps_ten, i, j)
         end

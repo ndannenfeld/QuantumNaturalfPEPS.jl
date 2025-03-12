@@ -57,7 +57,7 @@ function get_rotator(Ok_Tensor, S; update=exp_update, factor=0.05)
         u[:,2] = t
         u[:,1] = v
     end
-    return ITensor(u, inds_, inds_')
+    return itensor(u, inds_, inds_')
 end
 function get_rotator(i, j, peps, env_top, env_down, h_envs_r, h_envs_l)
     Ok_Tensor = peps[i, j]

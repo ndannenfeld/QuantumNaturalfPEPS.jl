@@ -4,7 +4,7 @@ function Ok_and_Ek(peps, ham_op; timer=TimerOutput(), Ok=nothing, sampling_mode=
                    resample=false, correct_sampling_error=true, resample_energy=0, # TODO: remove
                    )
     
-    S, logpc, env_top = @timeit timer "sampling" get_sample(peps; mode=sampling_mode) # draw a sample
+    S, logpc, env_top = @timeit timer "sampling" get_sample(peps; mode=sampling_mode, timer) # draw a sample
 
     
     
@@ -54,7 +54,7 @@ function Ek(peps, ham_op; timer=TimerOutput(),
             sampling_mode=:full,
             slow_energy=false, slow_energy_pos=(size(peps, 1)-1) ÷ 2)
 
-    S, logpc, env_top = @timeit timer "sampling" get_sample(peps; mode=sampling_mode) # draw a sample
+    S, logpc, env_top = @timeit timer "sampling" get_sample(peps; mode=sampling_mode, timer) # draw a sample
 
     # If sampling_mode is full, we do not need to overwrite the the top environments as they are already computed accurately
     overwrite = !(sampling_mode == :full)

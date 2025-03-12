@@ -12,7 +12,7 @@ mutable struct Environment
     end
     Environment(env; kwargs...) = Environment(env, 0.; kwargs...)
 end
-convert_eltype(::Type{S}, t::ITensor) where S = ITensor(S.(t.tensor))
+convert_eltype(::Type{S}, t::ITensor) where S = itensor(S.(t.tensor))
 Environment(::Type{S}, env::Environment) where S = Environment(convert_eltype.(S, env.env), S(env.f); normalize=false)
 
 
