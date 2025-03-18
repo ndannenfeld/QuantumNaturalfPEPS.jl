@@ -322,7 +322,7 @@ function get_Ek(peps::AbstractPEPS, ham::OpSum, sample; kwargs...)
     return get_Ek(peps, ham_op, sample; kwargs...)
 end
 
-function get_Ek(peps::AbstractPEPS, ham_op::TensorOperatorSum, sample; env_top=Array{Environment}(undef, size(S,1)-1), kwargs...)
+function get_Ek(peps::AbstractPEPS, ham_op::TensorOperatorSum, sample; env_top=Array{Environment}(undef, size(sample,1)-1), kwargs...)
     # get the environment tensors
     logψ, env_top, env_down = get_logψ_and_envs(peps, sample, env_top) # compute the environments of the peps according to that sample
     return get_Ek(peps, ham_op, env_top, env_down, sample, logψ; kwargs...)
