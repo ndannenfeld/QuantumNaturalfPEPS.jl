@@ -11,6 +11,13 @@ function generate_Oks_and_Eks_multiproc(peps::AbstractPEPS, ham_op::TensorOperat
         @timeit timer "double_layer_envs" double_layer_update(peps) # update the double layer environments once for the peps
         return @timeit timer "Oks_and_Eks" Oks_and_Eks_multiproc(peps, ham_op, sample_nr; timer, n_threads, kwargs...)
     end
+
+    function Oks_and_Eks_(peps_::AbstractPEPS, sample_nr::Integer; kwargs2...)
+        if length(kwargs2) > 0
+            kwargs = merge(kwargs, kwargs2)
+        end
+        return @timeit timer "Oks_and_Eks" Oks_and_Eks_multiproc(peps_, ham_op, sample_nr; timer, n_threads, kwargs...)
+    end
     return Oks_and_Eks_
 end
 

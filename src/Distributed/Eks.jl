@@ -174,6 +174,14 @@ function generate_Eks_multiproc(peps::AbstractPEPS, ham_op::TensorOperatorSum; t
         
         return @timeit timer "Eks_multiproc" Eks_multiproc(peps, ham_op, sample_nr; timer, kwargs...)
     end
+    function Eks_(peps_::AbstractPEPS, sample_nr::Integer; kwargs2...)
+        if length(kwargs2) > 0
+            kwargs_merged = merge(kwargs, kwargs2)
+            kwargs = kwargs_merged
+        end
+        return @timeit timer "Eks_multiproc" Eks_multiproc(peps_, ham_op, sample_nr; timer, kwargs...)
+    end
+
     return Eks_
 end
 

@@ -12,6 +12,16 @@ function generate_Oks_and_Eks_threaded(peps::AbstractPEPS, ham_op::TensorOperato
         end
         return Oks_and_Eks_threaded(peps, ham_op, sample_nr; timer, kwargs...)
     end
+    function Oks_and_Eks_(peps_::AbstractPEPS, sample_nr::Integer; reset_double_layer=false, kwargs2...) where T
+        if length(kwargs2) > 0
+            kwargs = merge(kwargs, kwargs2)
+        end
+        
+        if reset_double_layer
+            @timeit timer "double_layer_envs" double_layer_update(peps) # update the double layer environments once for the peps
+        end
+        return Oks_and_Eks_threaded(peps_, ham_op, sample_nr; timer, kwargs...)
+    end
     return Oks_and_Eks_
 end
 
