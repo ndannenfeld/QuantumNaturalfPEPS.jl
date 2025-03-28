@@ -162,19 +162,15 @@ function generate_Eks_multiproc(peps::AbstractPEPS, ham_op::TensorOperatorSum; t
             kwargs_merged = merge(kwargs, kwargs2)
             kwargs = kwargs_merged
         end
-        no_write = false
-        if haskey(kwargs, :no_write)
-            no_write = pop!(kwargs, :no_write)
-        end
 
-        if !no_write
-            write!(peps, Θ)
-            @timeit timer "double_layer_envs" update_double_layer_envs!(peps)
-        end
-        
+        @timeit timer "double_layer_envs" update_double_layer_envs!(peps)        
         return @timeit timer "Eks_multiproc" Eks_multiproc(peps, ham_op, sample_nr; timer, kwargs...)
     end
-    function Eks_(peps_::AbstractPEPS, sample_nr::Integer; kwargs2...)
+    function Eks_(peps_::Parameters{<:AbstractPEPS}, sample_nr::Integer; kwargs2...)
+        peps_ = peps_.obj
+        if getfield(peps_, :double_layer_envs) === nothing
+            update_double_layer_envs!(peps)
+        end
         if length(kwargs2) > 0
             kwargs_merged = merge(kwargs, kwargs2)
             kwargs = kwargs_merged

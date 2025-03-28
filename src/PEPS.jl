@@ -79,6 +79,14 @@ function Base.getproperty(x::AbstractPEPS, y::Symbol)
     end
 end
 
+all_params(peps::AbstractPEPS) = peps.tensors[:]
+function set_params!(peps::AbstractPEPS, tensors)
+    peps.tensors = reshape(tensors, size(peps.tensors))
+    if !all(peps.tensors[:] .=== tensors[:])
+        peps.double_layer_envs = nothing
+    end
+end
+
 Base.convert(::Type{Vector}, peps::AbstractPEPS; kwargs...) = vec(peps; kwargs...)
 function Base.vec(peps::AbstractPEPS; mask=peps.mask) # Flattens the tensors into a vector
     type = eltype(peps)

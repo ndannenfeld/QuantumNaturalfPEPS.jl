@@ -57,8 +57,21 @@ function generate_Oks_and_Eks_singlethread(peps::AbstractPEPS, ham_op::TensorOpe
         write!(peps, Θ)
         @timeit timer "double_layer_envs" double_layer_update(peps) # update the double layer environments once for the peps 
         
-        return Oks_and_Eks_singlethread(peps, ham_op, sample_nr; timer=timer, kwargs...)
+        return @timeit timer "Oks_and_Eks" Oks_and_Eks_singlethread(peps, ham_op, sample_nr; timer=timer, kwargs...)
     end
+
+    function Oks_and_Eks_(peps_::Parameters{<:AbstractPEPS}, sample_nr::Integer; kwargs2...)
+        peps_ = peps_.obj
+        if getfield(peps_, :double_layer_envs) === nothing
+            @timeit timer "double_layer_envs" double_layer_update(peps_)
+        end
+
+        if length(kwargs2) > 0
+            kwargs = merge(kwargs, kwargs2)
+        end
+        return @timeit timer "Oks_and_Eks" Oks_and_Eks_singlethread(peps_, ham_op, sample_nr; timer=timer, kwargs...)
+    end
+
     return Oks_and_Eks_
 end
 

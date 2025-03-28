@@ -12,13 +12,14 @@ using MPI
 using LinearAlgebra
 using ITensors
 
-using QuantumNaturalGradient: TensorOperatorSum
+using QuantumNaturalGradient: TensorOperatorSum, Parameters
 using QuantumNaturalGradient
 
 include("misc.jl")
 include("tensor_ops.jl")
 include("mps_ops.jl")
 include("PEPS.jl")
+include("parameters.jl")
 include("Environments.jl")
 include("sampling.jl")
 include("Ok.jl")
