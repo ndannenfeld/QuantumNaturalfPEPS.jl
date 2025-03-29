@@ -141,7 +141,6 @@ function write!(peps::AbstractPEPS, θ::Vector{T}; reset_double_layer=true, mask
 end
 
 ITensors.siteinds(type, Lx, Ly) = [siteind(type; addtags="nx=$i,ny=$j") for i in 1:Lx, j in 1:Ly]
-siteinds_compat(phys_dim, Lx, Ly) = [Index(phys_dim, "phys_$(j)_$(i)") for i in 1:Lx, j in 1:Ly] # TO be removed
 
 # initializes a PEPS
 PEPS(type, Lx::Int64, Ly::Int64; kwargs...) = PEPS(type, siteinds(type, Lx, Ly); kwargs...)
@@ -153,12 +152,12 @@ end
 PEPS(hilbert::Matrix{Index{Int64}}; kwargs...) = PEPS(Float64, hilbert; kwargs...)
 
 """
-    PEPS(S, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, shift=true, kwargs...) where {S<:Number}
+    PEPS(S, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, kwargs...) where {S<:Number}
     tensor_init: function that initializes the tensors, default=random_unitary other options: randomITensor
 """
-function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, shift=true, kwargs...) where {S<:Number}
+function PEPS(::Type{S}, hilbert::Matrix{Index{Int64}}; bond_dim::Int64=1, tensor_init=random_unitary, kwargs...) where {S<:Number}
     tensors = isoPEPS_tensor_init(S, hilbert, bond_dim; tensor_init)
-    return PEPS(tensors, bond_dim; shift, kwargs...)
+    return PEPS(tensors, bond_dim; kwargs...)
 end
 
 # alternative initializer that initializes the peps as an isopeps

@@ -10,6 +10,12 @@ function multiply_spectrum!(peps::AbstractPEPS, spectrum)
     return peps
 end
 
+function multiply_algebraic_spectrum!(peps::AbstractPEPS, α::Number)
+    bs = collect(1:maxbonddim(peps))
+    spectrum = bs .^ (-α)
+    return multiply_spectrum!(peps, spectrum)
+end
+
 function tensor_std(peps::AbstractPEPS)
     mean_, mean_2 = 0, 0
     l = 0
