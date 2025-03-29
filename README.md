@@ -1,3 +1,11 @@
+# QuantumNaturalfPEPS.jl
+`QuantumNaturalfPEPS` is a Julia package for simulating quantum many-body systems using the PEPS (Projected Entangled Pair States) framework. 
+# Feature Overview
+- **PEPS Framework**: Provides a flexible and efficient way to represent quantum many-body states.
+- **Natural Gradient Descent**: Implements the natural gradient descent algorithm for optimizing PEPS parameters using sampling techniques.
+
+
+
 # Minimal Example
 
 ```julia
