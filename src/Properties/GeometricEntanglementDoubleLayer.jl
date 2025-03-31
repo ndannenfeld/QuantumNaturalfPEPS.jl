@@ -1,5 +1,5 @@
 function update_sigma2(peps, sigma, t::ITensor, i, row, norm_factor)
-    in_prime = ITensors.inds(sigma, "ket_phys")
+    in_prime = prime(siteind(peps, row, i))
     tprime = t * delta(in_prime, siteind(peps, row, i))
     s = sigma* t * conj(tprime)
     return s / norm_factor
@@ -27,43 +27,48 @@ function geometric_entanglement_doublelayer(peps::AbstractPEPS; S=zeros(Int, siz
     
     logpc = 0
     # we loop through every row
-    global bra
+    global ket
     for row in 1:size(peps, 1)
         sigma = 1
-        bra, ket = get_bra_ket!(peps, row, indices_outer, env_top)
+        ket = get_ket(peps, row, env_top)
+        bra = prime.(conj(ket[:]))
         
         # we then calculate the unsampled environment (in one row)
-        calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
+        #calculate_unsampled_Env_row!(bra, ket, peps, row, E, indices_outer)
+        sites = siteinds(peps)
+        E = calculate_unsampled_Env_row(ket, bra, peps, row, sites[row, :])
         
         prod_tensors = ITensor[]
         # then we loop through the different sites in one row
         for i in 1:size(peps, 2)
             
             # calculate the 2x2 matrix from which we sample
-            ρ_r, sigma = get_reduced_ρ(bra, ket, peps, row, i, E, indices_outer, sigma)
-            
+            ρ_r, sigma = get_reduced_ρ(ket[i], bra[i], peps, row, i, E, sigma)
+
             #S[row, i], pc = sample_ρr(ρ_r)
             pc, prod_tensor = get_largest_eigenvec(ρ_r; norm=true)
             push!(prod_tensors, prod_tensor)
-            
+
             U = get_rotator(prod_tensor, S[row, i]; factor=1)
             Us[row, i] = U
             logpc += log(pc)
             
             # store the contraction of sampled sites in sigma
-            sigma = update_sigma2(peps, sigma, prod_tensor, i, row, pc)                     
+            sigma = update_sigma2(peps, sigma, prod_tensor, i, row, pc)    
         end
         
-        # the sampled bra is used to generate the top environments
-        bra = bra .* prod_tensors
+        # the sampled ket is used to generate the top environments
+        ket = ket .* noprime.(prod_tensors)
+        
         if row != size(peps, 1) 
             if row == 1
-                env_top[row] = Environment(MPS(bra.data); normalize=true)
+                env_top[row] = Environment(MPS(ket.data); normalize=true)
             else
-                env_top[row] = Environment(MPS(bra.data), env_top[row-1].f; normalize=true)
+                env_top[row] = Environment(MPS(ket.data), env_top[row-1].f; normalize=true)
             end
         end
+
     end
-    logψ = log(contract(bra)[]) + env_top[end].f
-    return logpc, logψ, Us
+    logψ = log(contract(ket)[]) + env_top[end].f
+    return logpc, logψ, prime.(Us, -1)
 end
