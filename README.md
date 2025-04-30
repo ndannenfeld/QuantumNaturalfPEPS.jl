@@ -55,10 +55,6 @@ Other features include calculation of Observables (Operator in the form of an Op
 ```julia
 observables, importance_weights = QuantumNaturalfPEPS.get_ExpectationValue(peps, Operator; it=10, multiproc=true)
 ```
-or the calculation of the geometric entanglement (see arXiv/2503.12557)
-```julia
-observables, importance_weights = QuantumNaturalfPEPS.get_ExpectationValue(peps, Operator; it=10, multiproc=true)
-```
 
 # Citation
 When citing our code, please use the following reference
