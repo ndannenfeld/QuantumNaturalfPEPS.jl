@@ -1,10 +1,9 @@
 # QuantumNaturalfPEPS.jl
-`QuantumNaturalfPEPS` is a Julia package for simulating quantum many-body systems using the PEPS (Projected Entangled Pair States) framework. 
+`QuantumNaturalfPEPS` is a Julia package for simulating quantum many-body systems using the PEPS (Projected Entangled Pair States) framework via sampling. 
 # Feature Overview
 - **PEPS Framework**: Provides a flexible and efficient way to represent quantum many-body states.
-- **Natural Gradient Descent**: Implements the natural gradient descent algorithm for optimizing PEPS parameters using sampling techniques.
-
-
+- **Natural Gradient Descent**: Implements the natural gradient descent algorithm for optimizing PEPS parameters using sampling techniques as described in [arXiv/2503.12557](https://arxiv.org/abs/2503.12557).
+- **Parallelization Support**: Designed to efficiently parallelize sampling and optimization across multiple cores or nodes.
 
 # Minimal Example
 
@@ -18,7 +17,7 @@ L = 4
 hilbert = siteinds("S=1/2", L, L)
 peps = PEPS(hilbert; bond_dim=2)
 
-# Multiply the spectrum of the PEPS by a power-law factor
+# Multiply the spectrum of the PEPS by a power-law factor as described in arXiv/2503.12557
 QuantumNaturalfPEPS.multiply_algebraic_spectrum!(peps, 3.)
 
 # Construct the Heisenberg Hamiltonian
@@ -51,3 +50,9 @@ solver = QuantumNaturalGradient.EigenSolver()
         maxiter=10,)
 
 ```
+
+
+# Citation
+When citing our code, please use the following reference
+
+Puente, D. A., Weerda, E. L., Schröder, K., & Rizzi, M. (2025). Efficient optimization and conceptual barriers in variational finite Projected Entangled-Pair States. arXiv preprint arXiv:2503.12557.
