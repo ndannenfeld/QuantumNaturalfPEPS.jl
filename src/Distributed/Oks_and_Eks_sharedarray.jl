@@ -94,7 +94,7 @@ function Oks_and_Eks_multiproc_sharedarrays(peps, ham_op, sample_nr; Oks=nothing
     else
         weights = logpcs
     end
-
+    @everywhere GC.gc() # Force garbage collection of the shared arrays on the remote workers.
     return Dict(:Oks => transpose(Oks), :Eks => Eks, :logψs => logψs,
                 :samples => samples, :weights => weights, :contract_dims => contract_dims)
 end
