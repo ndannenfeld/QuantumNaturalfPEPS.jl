@@ -57,8 +57,8 @@ function add_P_operators!(ham_op, hilbert, Lx, Ly, factor)
     end
 end
 
-function hamiltonain_CSL(hilbert, J1, J2, lambda)
-    ham_J1J2 = hamiltonain_J1J2(J1/4, J2/4, size(hilbert)...)
+function hamiltonain_CSL(hilbert, J1, J2, lambda; kwargs...)
+    ham_J1J2 = hamiltonain_J1J2(J1/4, J2/4, size(hilbert)...; kwargs...)
 
     # Create the tensor operator for the Hamiltonian
     tn_sum = QuantumNaturalGradient.TensorOperatorSum(ham_J1J2, hilbert)

@@ -15,8 +15,10 @@ function split_merge_slow(o1, o2; normalize_spectrum=true, directional=false, ne
     if value != 0
         S.tensor.storage[dim(comm)+1:end] .= value
     end
+    norm_ = 1
     if normalize_spectrum
-        S ./= norm(S)
+        norm_ = norm(S)
+        S ./= norm_
     end
     if directional
         S2 = itensor(S.tensor, (link_new, A.v))
@@ -31,7 +33,7 @@ function split_merge_slow(o1, o2; normalize_spectrum=true, directional=false, ne
         o1 = U * S1
         o2 = V * S2
     end
-    return o1, o2, S.tensor.storage
+    return o1, o2, S.tensor.storage, norm_
 end
 
 inv_cutoff_func(x; cutoff=1e-6) = x < cutoff ? 0 : 1/x
@@ -57,8 +59,11 @@ function split_merge(o1, o2; cutoff=1e-6, directional=false, normalize_spectrum=
 
     lambda_ = lambda_1 * lambda_2
     w1, S, w2 = svd(lambda_)
+
+    norm_ = 1
     if normalize_spectrum
-        S ./= norm(S)
+        norm_ = norm(S)
+        S ./= norm_
     end
     D1_inv = inv_cutoff_func.(D1_sqrt; cutoff)
     x_inv = u1 .* reshape(D1_inv, 1, :)
@@ -69,8 +74,8 @@ function split_merge(o1, o2; cutoff=1e-6, directional=false, normalize_spectrum=
     y_inv = y_inv * u2'
     
     if directional
-        x_ = x_inv
-        y_ = y_inv .* reshape(abs.(S), :, 1)
+        x_ = x_inv .* reshape(abs.(S), 1, :)
+        y_ = y_inv
     else
         x_ = x_inv .* reshape(sqrt.(abs.(S)), 1, :)
         y_ = y_inv .* reshape(sqrt.(abs.(S)), :, 1)
@@ -84,33 +89,117 @@ function split_merge(o1, o2; cutoff=1e-6, directional=false, normalize_spectrum=
     o2n = apply(o2, y_)
 
     #@show norm(o1n * o2n - o1 * o2)
-    return o1n, o2n, S
+    return o1n, o2n, S, norm_
 end
 
-function split_merge!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; split_merge_=split_merge, new_dim=maxbonddim(peps), kwargs...)
-    Sx = Array{Float64}(undef, size(peps, 1)-1, size(peps, 2), new_dim)
-    Sy = Array{Float64}(undef, size(peps, 1), size(peps, 2)-1, new_dim)
+
+
+function Smatrix(S, l)
+    inv_S = QuantumNaturalfPEPS.inv_cutoff_func.(S; cutoff=1e-6)
+    Sinv = itensor(diagm(inv_S), l, l')
+    S = itensor(diagm(S), l, l')
+    return S, Sinv
+end
+
+function get_peps_sqrtS(peps, Sx, Sy, i, j; exception=(-1,-1))
+    Ss = []
+    S_invs = []
+    if 1 < i && !(exception == (i-1, j))
+        l = commonind(peps[i-1, j], peps[i, j])
+        S = Sx[i-1, j, :]
+        S, Sinv = Smatrix(sqrt.(S), l)
+        
+        push!(Ss, S)
+        push!(S_invs, Sinv)
+    end
+    
+    if i < size(peps, 1) && !(exception == (i+1, j))
+        l = commonind(peps[i+1, j], peps[i, j])
+        S = Sx[i, j, :]
+        S, Sinv = Smatrix(sqrt.(S), l)
+        
+        push!(Ss, S)
+        push!(S_invs, Sinv)
+    end
+    
+    if 1 < j && !(exception == (i, j-1))
+        l = commonind(peps[i, j-1], peps[i, j])
+        S = Sy[i, j-1, :]
+        S, Sinv = Smatrix(sqrt.(S), l)
+        
+        push!(Ss, S)
+        push!(S_invs, Sinv)
+    end
+    
+    if j < size(peps, 2) && !(exception == (i, j+1))
+        l = commonind(peps[i, j+1], peps[i, j])
+        S = Sy[i, j, :]
+        S, Sinv = Smatrix(sqrt.(S), l)
+        
+        push!(Ss, S)
+        push!(S_invs, Sinv)
+    end
+    
+    return Ss, S_invs
+end
+
+function ITensors.apply(A::ITensor, B::Vector)
+    for i in 1:length(B)
+        A = apply(A, B[i])
+    end
+    return A
+end
+
+function split_merge!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; split_merge_=split_merge, new_dim=maxbonddim(peps),
+                      top_bottom_direction=false, left_right_direction=false, vidal=false, kwargs...)
+    Sx = ones(size(peps, 1)-1, size(peps, 2), new_dim)
+    Sy = ones(size(peps, 1), size(peps, 2)-1, new_dim)
+    lognorm = 0
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
         if i < size(peps, 1)
-            peps[i, j], peps[i+1, j], S = split_merge_(peps[i, j], peps[i+1, j]; new_dim, kwargs...)
+            if vidal
+                Ssqrts_1, S_invs_1 = get_peps_sqrtS(peps, Sx, Sy, i, j; exception=(i+1, j))
+                Ssqrts_2, S_invs_2 = get_peps_sqrtS(peps, Sx, Sy, i+1, j; exception=(i, j))
+                peps[i, j] = apply(peps[i, j], Ssqrts_1)
+                peps[i+1, j] = apply(peps[i+1, j], Ssqrts_2)
+            end
+            peps[i, j], peps[i+1, j], S, norm_ = split_merge_(peps[i, j], peps[i+1, j]; new_dim, directional=top_bottom_direction, kwargs...)
+            lognorm += log(norm_)
             Sx[i, j, :] .= S
+            if vidal
+                peps[i, j] = apply(peps[i, j], S_invs_1)
+                peps[i+1, j] = apply(peps[i+1, j], S_invs_2)
+            end
         end
         if j < size(peps, 2)
-            peps[i, j], peps[i, j+1], S = split_merge_(peps[i, j], peps[i, j+1]; new_dim, kwargs...)
+            if vidal
+                Ssqrts_1, S_invs_1 = get_peps_sqrtS(peps, Sx, Sy, i, j; exception=(i, j+1))
+                Ssqrts_2, S_invs_2 = get_peps_sqrtS(peps, Sx, Sy, i, j+1; exception=(i, j))
+                peps[i, j] = apply(peps[i, j], Ssqrts_1)
+                peps[i, j+1] = apply(peps[i, j+1], Ssqrts_2)
+            end
+            peps[i, j], peps[i, j+1], S, norm_ = split_merge_(peps[i, j], peps[i, j+1]; new_dim, directional=left_right_direction, kwargs...)
+            lognorm += log(norm_)
             Sy[i, j, :] .= S
+            if vidal
+                peps[i, j] = apply(peps[i, j], S_invs_1)
+                peps[i, j+1] = apply(peps[i, j+1], S_invs_2)
+            end
         end
     end
     if isa(peps, QuantumNaturalfPEPS.PEPS)
         peps.bond_dim = new_dim
     end
-    return Sx, Sy, peps
+    return Sx, Sy, peps, lognorm
 end
 
-function super_orthonormalization!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; k=1000, error=1e-8, verbose=false, kwargs...)   
-    Sx, Sy = split_merge!(peps; kwargs...)
+function super_orthonormalization!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; k=1000, error=1e-8, verbose=false, kwargs...)
+    # TODO: Use belief propagation to speed up the process https://arxiv.org/pdf/2306.17837v4#page=14.14
+    Sx, Sy, peps, lognorm = split_merge!(peps; kwargs...)
     res = -1.
     for i in 2:k
-        Sx2, Sy2 = split_merge!(peps; kwargs...)
+        Sx2, Sy2, peps, lognorm_ = split_merge!(peps; kwargs...)
+        lognorm += lognorm_
         res = mean(abs2, Sx2 .- Sx)
         res += mean(abs2, Sy2 .- Sy)
         Sx, Sy = Sx2, Sy2
@@ -124,7 +213,7 @@ function super_orthonormalization!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{
         end
     end
 
-    return Sx, Sy, peps, res
+    return Sx, Sy, peps, res, lognorm
 end
 
 super_orthonormalization(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; kwargs...) = super_orthonormalization!(deepcopy(peps); kwargs...)
@@ -173,17 +262,17 @@ function divide_on_split(o1, o2, S; directional=false)
     end
 end
 
-function divide_by_spectrum!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; Sx=nothing, Sy=nothing, directional=false)
+function divide_by_spectrum!(peps::Union{QuantumNaturalfPEPS.PEPS, Matrix{ITensor}}; Sx=nothing, Sy=nothing, directional=false, horizontal=true, vertical=true, kwargs...)
     if Sx === nothing
-        Sx, Sy, peps = QuantumNaturalfPEPS.super_orthonormalization!(peps)
+        Sx, Sy, peps = QuantumNaturalfPEPS.super_orthonormalization!(peps; kwargs...)
     end
 
     for i in 1:size(peps, 1), j in 1:size(peps, 2)
-        if i < size(peps, 1)
+        if i < size(peps, 1) && horizontal
             S = Sx[i, j, :]
             peps[i, j], peps[i+1, j] = divide_on_split(peps[i, j], peps[i+1,j], S; directional)
         end
-        if j < size(peps, 2)
+        if j < size(peps, 2) && vertical
             S = Sy[i, j, :]
             peps[i, j], peps[i, j+1] = divide_on_split(peps[i, j], peps[i,j+1], S; directional)
         end
