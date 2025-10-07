@@ -13,10 +13,10 @@ function _log_or_not_dot(
         M1dag = dag(M1)
     end
     sim!(linkinds, M1dag)
-    M1dag, M2 = deprecate_make_inds_match!(
+    M1dag, M2 = ITensorMPS.deprecate_make_inds_match!(
       ITensors._log_or_not_dot, M1dag, M2, loginner; make_inds_match
     )
-    check_hascommoninds(siteinds, M1dag, M2)
+    ITensorMPS.check_hascommoninds(siteinds, M1dag, M2)
     O = M1dag[1] * M2[1]
   
     if loginner
