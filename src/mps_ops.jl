@@ -1,4 +1,5 @@
-using ITensors: sim!, deprecate_make_inds_match!, check_hascommoninds
+using ITensors: sim!
+using ITensorsMPS
 # From abstractmps.jl
 function _log_or_not_dot(
     M1::MPST, M2::MPST, loginner::Bool; dag=true, make_inds_match::Bool=true
