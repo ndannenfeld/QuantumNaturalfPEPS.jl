@@ -97,10 +97,16 @@ function generate_env_row(peps_projected, contract_dim; env_row_above=nothing, a
     return Environment(peps_projected, norm_shift; normalize=true)
 end
 
-function get_logψ(env_top::Vector{Environment}, env_down::Vector{Environment}; pos=length(env_top)÷2)
+#=function get_logψ(env_top::Vector{Environment}, env_down::Vector{Environment}; pos=length(env_top)÷2)
     #ψS = contract(env_top[pos].env.*env_down[end-pos+1].env)[1]
     #logψS = log(Complex(ψS))
     logψS = _log_or_not_dot(env_top[pos].env, env_down[end-pos+1].env, true; dag=false)
+    return logψS + env_top[pos].f + env_down[end-pos+1].f
+end=#
+
+function get_logψ(env_top::Vector{Environment}, env_down::Vector{Environment}; pos=length(env_top)÷2)
+    ψS = contract(env_top[pos].env.*env_down[end-pos+1].env)[1]
+    logψS = log(Complex(ψS))
     return logψS + env_top[pos].f + env_down[end-pos+1].f
 end
 
