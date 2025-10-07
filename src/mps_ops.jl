@@ -1,5 +1,5 @@
 using ITensors: sim!
-using ITensorsMPS
+using ITensorMPS
 # From abstractmps.jl
 function _log_or_not_dot(
     M1::MPST, M2::MPST, loginner::Bool; dag=true, make_inds_match::Bool=true
