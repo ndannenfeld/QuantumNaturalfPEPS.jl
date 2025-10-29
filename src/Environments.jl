@@ -1,6 +1,6 @@
 # the entries of the environments are all normalized by the absolute value of the biggest entrie of the first ITensor
 # to get the true environtment: contract with the MPS and afterwards multiply by exp(f)
-using ITesnorMPS
+using ITensorMPS
 mutable struct Environment
     env::MPS
     f::Real
