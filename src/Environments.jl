@@ -1,5 +1,6 @@
 # the entries of the environments are all normalized by the absolute value of the biggest entrie of the first ITensor
 # to get the true environtment: contract with the MPS and afterwards multiply by exp(f)
+using ITensors
 using ITensorMPS
 mutable struct Environment
     env::MPS
@@ -19,8 +20,8 @@ Environment(::Type{S}, env::Environment) where S = Environment(convert_eltype.(S
 
 Base.getindex(env::Environment, i::Int) = env.env[i]
 Base.reverse(env::Environment) = ReverseEnvironment(env)
-maxlinkdim(env::Environment) = maxlinkdim(env.env)
-maxlinkdim(envs::Vector{Environment}) = maximum(maxlinkdim.(envs))
+maxlinkdim(env::Environment) = ITensors.maxlinkdim(env.env)
+maxlinkdim(envs::Vector{Environment}) = maximum(ITensors.maxlinkdim.(envs))
 
 struct ReverseEnvironment
     env::Environment
