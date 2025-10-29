@@ -20,7 +20,7 @@ Environment(::Type{S}, env::Environment) where S = Environment(convert_eltype.(S
 
 Base.getindex(env::Environment, i::Int) = env.env[i]
 Base.reverse(env::Environment) = ReverseEnvironment(env)
-maxlinkdim(env::Environment) = ITensors.maxlinkdim(env.env)
+maxlinkdim(env::Environment) = ITensorMPS.maxlinkdim(env.env)
 maxlinkdim(envs::Vector{Environment}) = maximum(maxlinkdim.(envs))
 
 struct ReverseEnvironment
