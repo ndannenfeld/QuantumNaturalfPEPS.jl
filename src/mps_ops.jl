@@ -1,7 +1,7 @@
 using ITensors
 using ITensorMPS
 # From abstractmps.jl
-function _log_or_not_dot(
+#=function _log_or_not_dot(
     M1::MPST, M2::MPST, loginner::Bool; dag=true, make_inds_match::Bool=true
   )::Number where {MPST<:ITensors.AbstractMPS}
     N = length(M1)
@@ -53,4 +53,4 @@ function _log_or_not_dot(
     end
   
     return dot_M1_M2
-  end
+  end=#
