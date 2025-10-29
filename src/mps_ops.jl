@@ -1,4 +1,4 @@
-using ITensors: sim!
+using ITensors
 using ITensorMPS
 # From abstractmps.jl
 function _log_or_not_dot(
