@@ -55,7 +55,7 @@ function get_logψ_and_envs(peps::AbstractPEPS, S::Array{Int64,2}, env_top=Array
     Lx = size(peps, 1)
     if overwrite === nothing
         # if env_top is given and the bond dimension is sufficient, we do not need to calculate it again
-        overwrite = !(isassigned(env_top, Lx-1) && maxlinkdim(env_top[Lx-1].env) >= peps.contract_dim)   
+        overwrite = !(isassigned(env_top, Lx-1) && ITensorMPS.maxlinkdim(env_top[Lx-1].env) >= peps.contract_dim)   
     end
     
     env_down = Array{Environment}(undef, size(peps, 1) - 1)
