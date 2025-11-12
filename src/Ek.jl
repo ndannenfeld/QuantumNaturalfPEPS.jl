@@ -261,7 +261,7 @@ function get_logψ_flipped(peps::AbstractPEPS, Ek_terms, env_top::Vector{Environ
     end
     
     # sorts the dictionary into the different categories
-    horizontal, vertical, fourBody, longerHor, other = sort_dict(Ek_terms, vertical=false)
+    horizontal, vertical, fourBody, longerHor, other = sort_dict(Ek_terms, vertical=true)
 
     # loop through every horizontal components
     @timeit timer "horizontal" for flip_term in horizontal 
