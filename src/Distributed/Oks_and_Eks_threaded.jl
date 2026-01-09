@@ -68,6 +68,9 @@ function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_w
             if eltype(O1) != eltype_
             Eks[j, i] = real(O1)
             else
+            if imag(O1)>10^-6
+           @warn "Large imaginary part detected"
+            end
             Eks[j, i]=O1
             end 
             logpcs[j, i] = real(O4)
