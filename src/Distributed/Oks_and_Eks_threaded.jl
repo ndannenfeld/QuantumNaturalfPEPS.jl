@@ -61,9 +61,17 @@ function Oks_and_Eks_threaded(peps, ham_op, sample_nr; Oks=nothing, importance_w
     seed = rand(UInt)
     Threads.@threads for i in 1:nr_threads
         Random.seed!(seed + i)
+    #Curde fix for the unexpected inexact error
         for j in 1:k
             Ok = @view Oks[:, j, i]
-            _, Eks[j, i], logψs[j, i], samples[j, i], logpcs[j, i], contract_dims[j, i] = Ok_and_Ek(peps, ham_op; Ok, kwargs...)
+           _,O1,logψs[j, i],samples[j, i],O4,contract_dims[j, i] = Ok_and_Ek(peps, ham_op; Ok, kwargs...)
+            if eltype(O1) != eltype_
+            Eks[j, i] = real(O1)
+            else
+            Eks[j, i]=O1
+            end 
+            logpcs[j, i] = real(O4)
+            #_, Eks[j, i], logψs[j, i], samples[j, i], logpcs[j, i], contract_dims[j, i] = Ok_and_Ek(peps, ham_op; Ok, kwargs...)
         end
     end
     Eks = reshape(Eks, :)
